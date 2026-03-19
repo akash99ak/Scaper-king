@@ -39,13 +39,18 @@ if "!NODE_EXE!" neq "node" if not exist "!NODE_EXE!" (
     exit /b 1
 )
 
+:: Set stable install directory (never changes, never conflicts with npm itself)
+set "SK_HOME=%APPDATA%\ScraperKing"
+if not exist "!SK_HOME!" mkdir "!SK_HOME!"
+
 :: Install packages if missing
-if not exist "%~dp0node_modules\playwright-extra" (
+if not exist "!SK_HOME!\node_modules\playwright-extra" (
     cls
     echo.
     echo  [SETUP] Installing required Node packages...
+    echo  [SETUP] Location: !SK_HOME!
     echo.
-    call "!NPM_CMD!" install playwright playwright-extra puppeteer-extra-plugin-stealth
+    call "!NPM_CMD!" install playwright playwright-extra puppeteer-extra-plugin-stealth --prefix "!SK_HOME!"
     if !errorlevel! neq 0 (
         color 0C
         echo  [ERROR] Install failed. Check your internet connection.
@@ -53,10 +58,18 @@ if not exist "%~dp0node_modules\playwright-extra" (
         exit /b 1
     )
     echo  [SETUP] Installing headless Chrome...
-    call "!NODE_EXE!" "%~dp0node_modules\.bin\playwright" install chromium
+    call "!NODE_EXE!" "!SK_HOME!\node_modules\playwright\cli.js" install chromium
+    if !errorlevel! neq 0 (
+        echo  [WARN] Chromium download failed, trying fallback...
+        call "!NPM_CMD!" exec --prefix "!SK_HOME!" playwright install chromium
+    )
     echo  [SETUP] Complete.
     timeout /t 2 >nul
 )
+
+:: Set NODE_PATH so autofill.js can require modules from SK_HOME
+set "NODE_PATH=!SK_HOME!\node_modules"
+
 
 :: ── STEP 1: Numbers file ──────────────────────────────────────
 :ask_numbers
