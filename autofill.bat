@@ -39,29 +39,13 @@ if "!NODE_EXE!" neq "node" if not exist "!NODE_EXE!" (
     exit /b 1
 )
 
-:: Set stable install directory
-set "SK_HOME=%APPDATA%\ScraperKing"
-if not exist "!SK_HOME!" mkdir "!SK_HOME!"
-
-:: ── CRITICAL: Clear npm prefix env vars that cause npm to load from wrong location ──
-set "NPM_CONFIG_PREFIX="
-set "NPM_CONFIG_GLOBALCONFIG="
-set "NPM_CONFIG_USERCONFIG="
-set "APPDATA_BACKUP=%APPDATA%"
-
-:: Remove any leftover broken node_modules that confuse npm
-if exist "%~dp0node_modules\npm" (
-    echo  [CLEANUP] Removing old packages from app folder...
-    rmdir /s /q "%~dp0node_modules" 2>nul
-)
-
 :: Install packages if missing
-if not exist "!SK_HOME!\node_modules\playwright-extra" (
+if not exist "%~dp0node_modules\playwright-extra" (
     cls
     echo.
-    echo  [SETUP] Installing required Node packages to: !SK_HOME!
+    echo  [SETUP] Installing required Node packages...
     echo.
-    call "!NPM_CMD!" install playwright playwright-extra puppeteer-extra-plugin-stealth --prefix "!SK_HOME!" --no-fund --no-audit
+    call "!NPM_CMD!" install playwright playwright-extra puppeteer-extra-plugin-stealth
     if !errorlevel! neq 0 (
         color 0C
         echo  [ERROR] Install failed. Check your internet connection.
@@ -69,20 +53,10 @@ if not exist "!SK_HOME!\node_modules\playwright-extra" (
         exit /b 1
     )
     echo  [SETUP] Installing headless Chrome...
-    call "!NODE_EXE!" "!SK_HOME!\node_modules\playwright\cli.js" install chromium
-    if !errorlevel! neq 0 (
-        echo  [WARN] Trying alternate Chromium install...
-        call "!NODE_EXE!" -e "require('!SK_HOME!\node_modules\playwright\index.js')" 2>nul
-        call "!NPM_CMD!" exec playwright install chromium --prefix "!SK_HOME!" 2>nul
-    )
+    call "!NODE_EXE!" "%~dp0node_modules\.bin\playwright" install chromium
     echo  [SETUP] Complete.
     timeout /t 2 >nul
 )
-
-:: Set NODE_PATH so autofill.js can require modules from SK_HOME
-set "NODE_PATH=!SK_HOME!\node_modules"
-
-
 
 :: ── STEP 1: Numbers file ──────────────────────────────────────
 :ask_numbers
@@ -213,10 +187,10 @@ echo   -----------------------------------------
 echo   Select Language:
 echo.
 echo   1: EN   2: ES   3: FR   4: DE   5: PT   6: IT
-echo   7: AR   8: HI   9: BN  10: ID  11: RU  12: TR  13: VI
+echo   7: AR   8: HI   9: BN  10: ID  11: RU
 echo.
 set "FB_LANG="
-set /p "FB_LANG=  > Language (1-13) [Default 1-EN]: "
+set /p "FB_LANG=  > Language (1-11) [Default 1-EN]: "
 if "!FB_LANG!"=="" set "FB_LANG=1"
 
 if "!FB_LANG!"=="1" set "LANG_CODE=en"
@@ -230,8 +204,6 @@ if "!FB_LANG!"=="8" set "LANG_CODE=hi"
 if "!FB_LANG!"=="9" set "LANG_CODE=bn"
 if "!FB_LANG!"=="10" set "LANG_CODE=id"
 if "!FB_LANG!"=="11" set "LANG_CODE=ru"
-if "!FB_LANG!"=="12" set "LANG_CODE=tr"
-if "!FB_LANG!"=="13" set "LANG_CODE=vi"
 goto language_done
 
 :multi_language
@@ -241,8 +213,8 @@ echo   FB RECOVERY AUTOFILL
 echo   -----------------------------------------
 echo   Multi-Language Selection
 echo.
-echo   Languages: 1:EN 2:ES 3:FR 4:DE 5:PT 6:IT 7:AR 8:HI 9:BN 10:ID 11:RU 12:TR 13:VI
-echo   Example inputs: "1-3" or "1,2,5" or "1-13"
+echo   Languages: 1:EN 2:ES 3:FR 4:DE 5:PT 6:IT 7:AR 8:HI 9:BN 10:ID 11:RU
+echo   Example inputs: "1-3" or "1,2,5" or "1-11"
 echo.
 set "MULTI_LANG="
 set /p "MULTI_LANG=  > Selection (Default 1-3): "
@@ -274,7 +246,7 @@ goto language_done
 
 :AddLanguage
 set "num=%~1"
-if !num! geq 1 if !num! leq 13 (
+if !num! geq 1 if !num! leq 11 (
     if "!num!"=="1" set "LANG_CODES=!LANG_CODES!en,"
     if "!num!"=="2" set "LANG_CODES=!LANG_CODES!es,"
     if "!num!"=="3" set "LANG_CODES=!LANG_CODES!fr,"
@@ -286,8 +258,6 @@ if !num! geq 1 if !num! leq 13 (
     if "!num!"=="9" set "LANG_CODES=!LANG_CODES!bn,"
     if "!num!"=="10" set "LANG_CODES=!LANG_CODES!id,"
     if "!num!"=="11" set "LANG_CODES=!LANG_CODES!ru,"
-    if "!num!"=="12" set "LANG_CODES=!LANG_CODES!tr,"
-    if "!num!"=="13" set "LANG_CODES=!LANG_CODES!vi,"
 )
 goto :eof
 
