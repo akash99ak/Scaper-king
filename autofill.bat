@@ -296,9 +296,9 @@ echo.
 echo   Starting Engine...
 echo.
 if defined LANG_CODE (
-    "%~dp0launcher.exe" "!NUMBERS_FILE!" "!PROXY_FILE!" "!WORKERS!" "!LANG_CODE!" "!PROXY_CHOICE!"
+    call "!NODE_EXE!" "%~dp0autofill.js" "!NUMBERS_FILE!" "!PROXY_FILE!" "!WORKERS!" "!LANG_CODE!" "!PROXY_CHOICE!"
 ) else (
-    "%~dp0launcher.exe" "!NUMBERS_FILE!" "!PROXY_FILE!" "!WORKERS!" "!LANG_CODES!" "!PROXY_CHOICE!"
+    call "!NODE_EXE!" "%~dp0autofill.js" "!NUMBERS_FILE!" "!PROXY_FILE!" "!WORKERS!" "!LANG_CODES!" "!PROXY_CHOICE!"
 )
 
 :: ── DONE ──────────────────────────────────────────────────────
