@@ -1,4 +1,1 @@
-{
-  "version": "1.0",
-  "files": ["autofill.bat", "autofill.js", "worker.js"]
-}
+{ "version": "1.1" } 
