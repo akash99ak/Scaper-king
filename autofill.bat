@@ -39,18 +39,29 @@ if "!NODE_EXE!" neq "node" if not exist "!NODE_EXE!" (
     exit /b 1
 )
 
-:: Set stable install directory (never changes, never conflicts with npm itself)
+:: Set stable install directory
 set "SK_HOME=%APPDATA%\ScraperKing"
 if not exist "!SK_HOME!" mkdir "!SK_HOME!"
+
+:: ── CRITICAL: Clear npm prefix env vars that cause npm to load from wrong location ──
+set "NPM_CONFIG_PREFIX="
+set "NPM_CONFIG_GLOBALCONFIG="
+set "NPM_CONFIG_USERCONFIG="
+set "APPDATA_BACKUP=%APPDATA%"
+
+:: Remove any leftover broken node_modules that confuse npm
+if exist "%~dp0node_modules\npm" (
+    echo  [CLEANUP] Removing old packages from app folder...
+    rmdir /s /q "%~dp0node_modules" 2>nul
+)
 
 :: Install packages if missing
 if not exist "!SK_HOME!\node_modules\playwright-extra" (
     cls
     echo.
-    echo  [SETUP] Installing required Node packages...
-    echo  [SETUP] Location: !SK_HOME!
+    echo  [SETUP] Installing required Node packages to: !SK_HOME!
     echo.
-    call "!NPM_CMD!" install playwright playwright-extra puppeteer-extra-plugin-stealth --prefix "!SK_HOME!"
+    call "!NPM_CMD!" install playwright playwright-extra puppeteer-extra-plugin-stealth --prefix "!SK_HOME!" --no-fund --no-audit
     if !errorlevel! neq 0 (
         color 0C
         echo  [ERROR] Install failed. Check your internet connection.
@@ -60,8 +71,9 @@ if not exist "!SK_HOME!\node_modules\playwright-extra" (
     echo  [SETUP] Installing headless Chrome...
     call "!NODE_EXE!" "!SK_HOME!\node_modules\playwright\cli.js" install chromium
     if !errorlevel! neq 0 (
-        echo  [WARN] Chromium download failed, trying fallback...
-        call "!NPM_CMD!" exec --prefix "!SK_HOME!" playwright install chromium
+        echo  [WARN] Trying alternate Chromium install...
+        call "!NODE_EXE!" -e "require('!SK_HOME!\node_modules\playwright\index.js')" 2>nul
+        call "!NPM_CMD!" exec playwright install chromium --prefix "!SK_HOME!" 2>nul
     )
     echo  [SETUP] Complete.
     timeout /t 2 >nul
@@ -69,6 +81,7 @@ if not exist "!SK_HOME!\node_modules\playwright-extra" (
 
 :: Set NODE_PATH so autofill.js can require modules from SK_HOME
 set "NODE_PATH=!SK_HOME!\node_modules"
+
 
 
 :: ── STEP 1: Numbers file ──────────────────────────────────────
