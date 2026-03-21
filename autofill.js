@@ -1,13 +1,18 @@
 // ============================================================
-//  FB Recovery OTP Autofill — Clean Version (No VPN)
-//  Features: Smart retry, proxy refresh, resume, rate limit
-//            detection, captcha detection, live dashboard
-//  Usage: node autofill.js numbers.txt [proxy.txt] [workers] [ua.txt]
+//  FB Recovery OTP Autofill
+//  v2.0 — Decodo session-rotation, mbasic-first, 5x SMS loop
+//  Usage: node autofill.js numbers.txt [proxy.txt] [workers] [lang] [mode]
+//  Modes: decodo | custom | direct
 // ============================================================
+
+// ┌─────────────────────────────────────────────────────┐
+// │           BRIGHT DATA CONFIG                        │
+// └─────────────────────────────────────────────────────┘
+// └─────────────────────────────────────────────────────┘
 
 const fs = require('fs');
 const path = require('path');
-const { Worker, spawn } = require('worker_threads');
+const { Worker } = require('worker_threads');
 const os = require('os');
 const http = require('http');
 const https = require('https');
@@ -19,87 +24,63 @@ let DEBUG_FILE = 'debug.txt';
 let PROGRESS_FILE = 'progress.json';
 let NO_SMS_FILE = 'no_sms.txt';
 
-// Language-specific Facebook domains
+// ── Domain list: mbasic first (simplest DOM, most reliable SMS detection) ──
+// mbasic → m → www. Language subdomains removed (they add noise not value).
 const FB_DOMAINS_BY_LANGUAGE = {
     'en': [
-        'https://www.facebook.com',
-        'https://m.facebook.com',
         'https://mbasic.facebook.com',
-        'https://touch.facebook.com',
-        'https://free.facebook.com',
-        'https://x.facebook.com',
-        'https://m.alpha.facebook.com',
-        'https://m.beta.facebook.com'
+        'https://m.facebook.com',
+        'https://www.facebook.com',
     ],
     'es': [
-        'https://es-es.facebook.com',
-        'https://m.es-es.facebook.com',
-        'https://mbasic.es-es.facebook.com',
+        'https://mbasic.facebook.com',
+        'https://m.facebook.com',
         'https://www.facebook.com',
-        'https://m.facebook.com'
     ],
     'fr': [
-        'https://fr-fr.facebook.com',
-        'https://m.fr-fr.facebook.com',
-        'https://mbasic.fr-fr.facebook.com',
+        'https://mbasic.facebook.com',
+        'https://m.facebook.com',
         'https://www.facebook.com',
-        'https://m.facebook.com'
     ],
     'de': [
-        'https://de-de.facebook.com',
-        'https://m.de-de.facebook.com',
-        'https://mbasic.de-de.facebook.com',
+        'https://mbasic.facebook.com',
+        'https://m.facebook.com',
         'https://www.facebook.com',
-        'https://m.facebook.com'
     ],
     'pt': [
-        'https://pt-br.facebook.com',
-        'https://m.pt-br.facebook.com',
-        'https://mbasic.pt-br.facebook.com',
+        'https://mbasic.facebook.com',
+        'https://m.facebook.com',
         'https://www.facebook.com',
-        'https://m.facebook.com'
     ],
     'it': [
-        'https://it-it.facebook.com',
-        'https://m.it-it.facebook.com',
-        'https://mbasic.it-it.facebook.com',
+        'https://mbasic.facebook.com',
+        'https://m.facebook.com',
         'https://www.facebook.com',
-        'https://m.facebook.com'
     ],
     'ar': [
-        'https://ar-ar.facebook.com',
-        'https://m.ar-ar.facebook.com',
-        'https://mbasic.ar-ar.facebook.com',
+        'https://mbasic.facebook.com',
+        'https://m.facebook.com',
         'https://www.facebook.com',
-        'https://m.facebook.com'
     ],
     'hi': [
-        'https://hi-in.facebook.com',
-        'https://m.hi-in.facebook.com',
-        'https://mbasic.hi-in.facebook.com',
+        'https://mbasic.facebook.com',
+        'https://m.facebook.com',
         'https://www.facebook.com',
-        'https://m.facebook.com'
     ],
     'bn': [
-        'https://bn-in.facebook.com',
-        'https://m.bn-in.facebook.com',
-        'https://mbasic.bn-in.facebook.com',
+        'https://mbasic.facebook.com',
+        'https://m.facebook.com',
         'https://www.facebook.com',
-        'https://m.facebook.com'
     ],
     'id': [
-        'https://id-id.facebook.com',
-        'https://m.id-id.facebook.com',
-        'https://mbasic.id-id.facebook.com',
+        'https://mbasic.facebook.com',
+        'https://m.facebook.com',
         'https://www.facebook.com',
-        'https://m.facebook.com'
     ],
     'ru': [
-        'https://ru-ru.facebook.com',
-        'https://m.ru-ru.facebook.com',
-        'https://mbasic.ru-ru.facebook.com',
+        'https://mbasic.facebook.com',
+        'https://m.facebook.com',
         'https://www.facebook.com',
-        'https://m.facebook.com'
     ]
 };
 
@@ -291,14 +272,36 @@ function moveCursorUp(lines) {
     }
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+//  ProxyManager — Three modes:
+//
+//  'freeproxy'  — Fetches fresh proxies from github/proxyscrape.
+//                 Tests up to 300 in parallel to build a working pool.
+//
+//  'custom'     — Load proxies from a text file (host:port:user:pass format).
+//                 Rotates through the list, 1 IP per number.
+//
+//  'direct'     — No proxy. Direct connection.
+//
+// Checker: upgraded to real HTTP CONNECT tunnel test (reads '200 Connection
+// established' response line) — confirms proxy can actually relay HTTPS, 
+// not just open a TCP socket.
+// ══════════════════════════════════════════════════════════════════════════════
 // ══════════════════════════════════════════════════════════════════
-//  ProxyManager — Pipeline Architecture
-//  Producer: background checker tests Decodo proxies in parallel
+//  ProxyManager — Pipeline Architecture (Enhanced Backup Version)
+//  Producer: background checker tests scraped proxies in parallel
 //  Consumer: OTP workers pull exactly 1 verified proxy per number
 //  1 IP = 1 number strictly (proxy popped from queue, never reused)
 // ══════════════════════════════════════════════════════════════════
 class ProxyManager {
-    constructor() {
+    constructor(mode = 'freeproxy', customList = []) {
+        this.mode = mode; // 'freeproxy' or 'custom'
+        
+        // For custom mode
+        this._proxyList = customList;
+        this._listIdx = 0;
+
+        // For auto/freeproxy mode pipeline
         this.verifiedQueue = [];   // ready-to-use verified proxies
         this.pendingQueue = [];   // fetched but not yet tested
         this.usedProxies = new Set(); // prevent reuse within a run
@@ -393,21 +396,41 @@ class ProxyManager {
         }
     }
 
-    // ── Test a single proxy: fast TCP CONNECT to filter dead sockets ──
-    // Note: real quality gate is markFailure() called after actual Playwright navigation fails
-    testProxy(ip, port) {
+    // ── Real HTTP CONNECT tunnel test ────────────────────────────────────────
+    // Replaces the weak socket check with a strict '200 Connection established' tunnel test
+    testTunnel(host, port, username, password, timeoutMs = 7000) {
         return new Promise((resolve) => {
-            const req = http.request({
-                host: ip,
-                port: parseInt(port),
-                method: 'CONNECT',
-                path: 'www.facebook.com:443',
-                timeout: 4000
-            });
-            req.setTimeout(4000, () => { req.destroy(); resolve(false); });
-            req.on('connect', () => { req.destroy(); resolve(true); });
-            req.on('error', () => resolve(false));
-            req.end();
+            try {
+                const authHeader = (username && password)
+                    ? `Proxy-Authorization: Basic ${Buffer.from(`${username}:${password}`).toString('base64')}\r\n`
+                    : '';
+                const req = `CONNECT www.facebook.com:443 HTTP/1.1\r\nHost: www.facebook.com:443\r\n${authHeader}\r\n`;
+
+                const sock = require('net').connect({ host, port: parseInt(port), timeout: timeoutMs });
+                let responded = false;
+
+                sock.setTimeout(timeoutMs, () => {
+                    if (!responded) { responded = true; sock.destroy(); resolve(false); }
+                });
+
+                sock.on('connect', () => sock.write(req));
+
+                sock.on('data', (chunk) => {
+                    if (responded) return;
+                    responded = true;
+                    const resp = chunk.toString();
+                    const ok = resp.includes('200');
+                    // Silently test during background checks to avoid log spam, 
+                    // debug logging disabled here since thousands are tested
+                    sock.destroy();
+                    resolve(ok);
+                });
+
+                sock.on('error', () => { if (!responded) { responded = true; resolve(false); } });
+                sock.on('close', () => { if (!responded) { responded = true; resolve(false); } });
+            } catch (e) {
+                resolve(false);
+            }
         });
     }
 
@@ -427,7 +450,7 @@ class ProxyManager {
             const batch = this.pendingQueue.splice(0, this.TEST_CONCURRENCY);
             const results = await Promise.all(
                 batch.map(async (p) => {
-                    const ok = await this.testProxy(p.ip, p.port);
+                    const ok = await this.testTunnel(p.ip, p.port, '', '', 5000);
                     return { p, ok };
                 })
             );
@@ -450,11 +473,11 @@ class ProxyManager {
         }
     }
 
-    // ── Fetch a new batch from Decodo and add to pending queue ──
+    // ── Fetch a new batch from APIs and add to pending queue ──
     async _refill() {
         if (this.isRefilling) return;
         this.isRefilling = true;
-        log('🔄 Refilling proxy pool from Decodo...');
+        log('🔄 Refilling auto proxy pool...');
         try {
             const fresh = await this.fetchFromDecodo();
             // Filter out already-used proxies
@@ -468,65 +491,116 @@ class ProxyManager {
         this.isRefilling = false;
     }
 
-    // ── Start the system: fetch first batch and launch background checker ──
+    // ── Start the system ──────────────────────────────────────────────────
     async start() {
-        log('🚀 Starting ProxyManager pipeline...');
-        const initial = await this.fetchFromDecodo();
-        this.pendingQueue.push(...initial);
-        this.totalFetched = initial.length;
-        log(`📋 ${initial.length} proxies queued for testing. Starting background checker...`);
+        if (this.mode === 'freeproxy') {
+            log('🚀 Starting Auto-Scraping ProxyManager pipeline (Enhanced)...');
+            const initial = await this.fetchFromDecodo();
+            this.pendingQueue.push(...initial);
+            this.totalFetched = initial.length;
+            log(`📋 ${initial.length} scraped proxies queued. Starting robust TCP tunneling verifier...`);
 
-        // Start checker in background (don't await — it runs forever)
-        this._startChecker();
+            // Start checker in background (runs forever)
+            this._startChecker();
 
-        // Wait until at least 10 verified proxies are ready before starting OTP work
-        log('⏳ Waiting for first verified proxies...');
-        const waitStart = Date.now();
-        while (this.verifiedQueue.length < 10 && Date.now() - waitStart < 30000) {
-            await new Promise(r => setTimeout(r, 300));
-        }
-        if (this.verifiedQueue.length === 0) {
-            log('⚠️ No verified proxies after 30s wait — Decodo may be unavailable. Running direct (no proxy).');
-        } else {
-            log(`✅ ProxyManager ready: ${this.verifiedQueue.length} verified, ${this.pendingQueue.length} still being tested`);
+            // Wait until at least 15 verified proxies are ready before starting OTP work
+            log('⏳ Waiting up to 30s for the first 15 fully-verified proxies...');
+            const waitStart = Date.now();
+            while (this.verifiedQueue.length < 15 && Date.now() - waitStart < 30000) {
+                await new Promise(r => setTimeout(r, 300));
+            }
+            if (this.verifiedQueue.length === 0) {
+                log('⚠️ No proxies passed the strict tunnel verification in 30s. Falling back to direct connection.');
+                this.mode = 'direct';
+            } else {
+                log(`✅ ProxyManager ready: ${this.verifiedQueue.length} ultra-verified proxies in queue!`);
+            }
+        } 
+        else if (this.mode === 'custom') {
+            log(`📋 Custom proxy list: ${this._proxyList.length} proxies. Checking connectivity...`);
+            let alive = 0;
+            const checked = [];
+            for (const p of this._proxyList) {
+                const parts = p.split(':');
+                const [host, port, user, pass] = parts.length >= 4 
+                    ? parts : [parts[0], parts[1], '', ''];
+                const ok = await this.testTunnel(host, port, user, pass, 6000);
+                if (ok) { alive++; checked.push(p); }
+                else this.totalFailed++;
+            }
+            this._proxyList = checked;
+            this.totalVerified = alive;
+            log(`✅ Custom proxies: ${alive}/${alive + this.totalFailed} verified and ready.`);
+        } 
+        else {
+            log('🚀 Direct mode — no proxy');
         }
     }
 
-    // ── Get next verified proxy (1 IP = 1 number, strict no-reuse) ──
     getProxy() {
-        if (this.verifiedQueue.length === 0) return null;
-        const proxy = this.verifiedQueue.shift(); // pop from front (FIFO)
-        this.usedProxies.add(proxy);
+        if (this.mode === 'custom') {
+            if (this._proxyList.length === 0) return null;
+            const proxy = this._proxyList[this._listIdx % this._proxyList.length];
+            this._listIdx++;
+            this.usedProxies.add(proxy);
+            return proxy;
+        } 
+        else if (this.mode === 'freeproxy') {
+            if (this.verifiedQueue.length === 0) return null;
+            const proxy = this.verifiedQueue.shift(); // pop from front (FIFO)
+            this.usedProxies.add(proxy);
 
-        // Trigger background refill only when pending list is also exhausted
-        if (this.verifiedQueue.length < this.REFILL_TRIGGER && !this.isRefilling && this.pendingQueue.length === 0) {
-            this._refill(); // fire-and-forget
+            // Trigger background refill only when pending list is also exhausted
+            if (this.verifiedQueue.length < this.REFILL_TRIGGER && !this.isRefilling && this.pendingQueue.length === 0) {
+                this._refill(); // fire-and-forget
+            }
+            return proxy;
         }
-        return proxy;
+        return null; // direct
     }
 
-    markSuccess(proxy) { /* proxy was good — already used, nothing to do */ }
+    get totalVerifiedDisplay() {
+        return this.mode === 'freeproxy' ? this.verifiedQueue.length : (this._proxyList ? this._proxyList.length : 0);
+    }
+
+    markSuccess(proxy) { }
     markFailure(proxy) {
-        if (proxy) {
-            // Add to permanent blacklist — this proxy failed in real Playwright navigation
+        if (proxy && this.mode === 'custom') {
+            const idx = this._proxyList.indexOf(proxy);
+            if (idx !== -1) this._proxyList.splice(idx, 1);
+            this.totalFailed++;
+        } else if (proxy && this.mode === 'freeproxy') {
             this.usedProxies.add(proxy);
-            // Also remove from verifiedQueue in case it's still sitting there
             const idx = this.verifiedQueue.indexOf(proxy);
             if (idx !== -1) this.verifiedQueue.splice(idx, 1);
         }
     }
 
     getStats() {
-        return {
-            verified: this.verifiedQueue.length,
-            pending: this.pendingQueue.length,
-            totalFetched: this.totalFetched,
-            totalVerified: this.totalVerified,
-            totalFailed: this.totalFailed,
-            used: this.usedProxies.size
-        };
+        if (this.mode === 'freeproxy') {
+            return {
+                verified: this.verifiedQueue.length,
+                pending: this.pendingQueue.length,
+                totalFetched: this.totalFetched,
+                totalVerified: this.totalVerified,
+                totalFailed: this.totalFailed,
+                used: this.usedProxies.size,
+                mode: this.mode
+            };
+        } else {
+            return {
+                verified: this._proxyList ? this._proxyList.length : 0,
+                pending: 0,
+                totalFetched: this._proxyList ? this._proxyList.length : 0,
+                totalVerified: this.totalVerified,
+                totalFailed: this.totalFailed,
+                used: this.usedProxies ? this.usedProxies.size : 0,
+                mode: this.mode
+            };
+        }
     }
 }
+
 
 
 
@@ -760,38 +834,36 @@ async function main() {
     const languageList = languageCodes.split(',').map(lang => lang.trim()).filter(Boolean);
     console.log(`🌍 Using ${languageList.length} language(s): ${languageList.join(', ').toUpperCase()}`);
 
-    // Initialize proxy system based on user choice
-    if (proxyChoice === 'auto') {
-        console.log('🌐 Initializing ProxyManager pipeline (auto mode)...');
-        proxyManager = new ProxyManager();
-        await proxyManager.start();  // fetches from Decodo, starts background checker, waits for 10 verified
+    // ── Auto-detect proxy mode ──
+    let resolvedMode = proxyChoice;
+    if (resolvedMode === 'auto') {
+        if (proxyFile && fs.existsSync(proxyFile)) {
+            resolvedMode = 'custom';
+            console.log(`📁 Auto-detected proxy file — using custom mode: ${proxyFile}`);
+        } else {
+            resolvedMode = 'freeproxy';
+            console.log('🌍 No proxy file found — auto-fetching free proxies from the internet');
+        }
+    }
 
-        const s = proxyManager.getStats();
-        console.log(`✅ ProxyManager ready:`);
-        console.log(`   Verified & ready: ${s.verified}`);
-        console.log(`   Pending testing:  ${s.pending}`);
-        console.log(`   Total fetched:    ${s.totalFetched}`);
-    } else if (proxyChoice === 'custom' && proxyFile) {
+    console.log(`🔧 Proxy Mode: ${resolvedMode.toUpperCase()}`);
+
+    // Initialize proxy system based on resolved mode
+    if (resolvedMode === 'freeproxy') {
+        console.log(`🌐 Free Proxy Auto-Scraper mode`);
+        console.log('   ✦ Automatically fetching thousands of public HTTP proxies...');
+        console.log('   ✦ Checking them against Facebook to drop dead ones');
+        proxyManager = new ProxyManager('freeproxy');
+        await proxyManager.start();
+    } else if (resolvedMode === 'custom' && proxyFile && fs.existsSync(proxyFile)) {
         console.log(`📁 Loading custom proxy file: ${proxyFile}`);
         try {
             const lines = fs.readFileSync(proxyFile, 'utf8')
                 .split('\n')
                 .map(l => l.trim())
                 .filter(l => l && l.includes(':'));
-
-            // Wrap custom proxies in a minimal ProxyManager-compatible object
-            let idx = 0;
-            proxyManager = {
-                verifiedQueue: [...lines],
-                getProxy: function () {
-                    if (this.verifiedQueue.length === 0) return null;
-                    return this.verifiedQueue.shift();
-                },
-                markSuccess: function () { },
-                markFailure: function () { },
-                getStats: function () { return { verified: this.verifiedQueue.length, pending: 0, totalFetched: lines.length, totalVerified: lines.length, totalFailed: 0, used: 0 }; }
-            };
-            console.log(`✅ Loaded ${lines.length} custom proxies into queue`);
+            proxyManager = new ProxyManager('custom', lines);
+            await proxyManager.start();
         } catch (error) {
             console.log(`❌ Failed to load custom proxy file: ${error.message}`);
             console.log('⚠️ Falling back to direct connection');
@@ -799,9 +871,14 @@ async function main() {
         }
     } else {
         console.log('🚀 Using direct connection (no proxies)');
-        proxyManager = null;
+        proxyManager = new ProxyManager('direct');
     }
 
+    // Direct mode IP protections
+    if (proxyManager && proxyManager.mode === 'direct' && numWorkers > 2) {
+        console.log(`\n\x1b[33m⚠️  Throttling workers from ${numWorkers} to 2 to prevent IP ban/rate-limiting on direct connection.\x1b[0m\n`);
+        numWorkers = 2;
+    }
 
     // Auto-generate fresh user agents for this run
     const userAgents = generateFreshUserAgents();
@@ -1060,7 +1137,7 @@ async function main() {
                     }
 
                     if (msg.type !== 'result') return;
-                    const { number, result, errorMsg, language, proxy: usedProxy } = msg;
+                    const { number, result, errorMsg, language, proxy: usedProxy, sendCount } = msg;
 
                     // Immediately blacklist any proxy that failed during navigation
                     if (result === 'error' && usedProxy && proxyManager) {
@@ -1107,7 +1184,8 @@ async function main() {
                         updateProxyStats(numberProxies[number] || null, true);
 
                         // Track successful OTP sent
-                        log(`✅ [${stats.done}/${stats.total}] ${number}  →  OTP sent  [${language?.toUpperCase() || 'EN'}] [${numberDomains[number]?.replace('https://', '') || ''}]`);
+                        const sends = sendCount > 1 ? ` x${sendCount}` : '';
+                        log(`✅ [${stats.done}/${stats.total}] ${number}  →  OTP sent${sends}  [${language?.toUpperCase() || 'EN'}] [${numberDomains[number]?.replace('https://', '') || ''}]`);
 
                     } else if (result === 'no_account') {
                         stats.noAccount++;

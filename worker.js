@@ -1,5 +1,7 @@
 // ============================================================
 //  Worker — One persistent browser, clears session per number
+//  v2.0 — Fixed false-OTP bug, 5x resend, account selection,
+//          mbasic-first, sticky IP + UA per number
 // ============================================================
 
 const { parentPort } = require('worker_threads');
@@ -18,7 +20,6 @@ async function loadPlaywright() {
 }
 
 async function getBrowser() {
-    // Launch once, reuse for all numbers in this worker. Proxy is applied per-context now.
     if (!browser || !browser.isConnected()) {
         const opts = {
             headless: true,
@@ -67,6 +68,9 @@ function parseProxy(proxyStr) {
     if (!proxyStr) return null;
     proxyStr = proxyStr.trim();
     if (!proxyStr.includes(':')) return null;
+
+    const getProtocol = (port) => port === '33335' ? 'https' : 'http';
+
     try {
         if (proxyStr.includes('@')) {
             const [creds, hp] = proxyStr.split('@');
@@ -76,7 +80,7 @@ function parseProxy(proxyStr) {
             if (!host || !port || !username) return null;
             const portNum = parseInt(port);
             if (isNaN(portNum) || portNum < 1 || portNum > 65535) return null;
-            return { server: `http://${host}:${port}`, username, password: password || '' };
+            return { server: `${getProtocol(port)}://${host}:${port}`, username, password: password || '' };
         }
         const parts = proxyStr.split(':');
         if (parts.length === 4) {
@@ -84,21 +88,21 @@ function parseProxy(proxyStr) {
             if (!host || !port || !username) return null;
             const portNum = parseInt(port);
             if (isNaN(portNum) || portNum < 1 || portNum > 65535) return null;
-            return { server: `http://${host}:${port}`, username, password: password || '' };
+            return { server: `${getProtocol(port)}://${host}:${port}`, username, password: password || '' };
         }
         if (parts.length === 3) {
             const [host, port, username] = parts;
             if (!host || !port || !username) return null;
             const portNum = parseInt(port);
             if (isNaN(portNum) || portNum < 1 || portNum > 65535) return null;
-            return { server: `http://${host}:${port}`, username, password: '' };
+            return { server: `${getProtocol(port)}://${host}:${port}`, username, password: '' };
         }
         if (parts.length === 2) {
             const [host, port] = parts;
             if (!host || !port) return null;
             const portNum = parseInt(port);
             if (isNaN(portNum) || portNum < 1 || portNum > 65535) return null;
-            return { server: `http://${host}:${port}` };
+            return { server: `${getProtocol(port)}://${host}:${port}` };
         }
     } catch (e) {
         return null;
@@ -107,8 +111,6 @@ function parseProxy(proxyStr) {
 }
 
 // ── Dynamic UA Generator ─────────────────────────────────────────────────────
-// Generates a completely fresh user agent for every single task,
-// properly matched to whether the target domain is mobile or desktop.
 function generateUA(isMobile) {
     const rand = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
@@ -127,7 +129,6 @@ function generateUA(isMobile) {
     const iOSVersions = [
         '17_4_1', '17_4', '17_3_1', '17_3', '17_2_1', '17_2',
         '17_1_2', '17_1', '17_0_3', '17_0', '16_7_7', '16_7_5',
-        '16_7_2', '16_6_1', '16_6', '16_5_1',
     ];
     const iOSSafariVersions = [
         '17.4', '17.3', '17.2', '17.1', '17.0', '16.7', '16.6', '16.5',
@@ -210,63 +211,40 @@ const NO_ACCOUNT_PHRASES = [
 ];
 
 const SMS_SIGNALS = [
-    // English — specific phrases only (avoid 'get code', 'send code', 'phone' — too broad)
     'sms', 'text message', 'text me', 'send sms', 'send text',
     'code via sms', 'sms code', 'get code via sms', 'get code via text',
     'phone verification', 'verify by phone', 'phone verification code',
     'verification code', 'mobile code', 'phone code', 'receive sms',
-
     // Bengali
     'এসএমএস', 'এসএমএস-এর মাধ্যমে', 'কোড পান', 'ফোনে কোড পাঠান',
-    'এসএমএস করুন', 'বার্তা পাঠান', 'ফোন নম্বর', 'যাচাই কোড',
-
     // Arabic
     'رسالة نصية', 'رسالة', 'رقم الهاتف', 'إرسال الكود', 'كود عبر الهاتف',
-    'إرسال رسالة', 'رسالة نصية قصيرة', 'رمز التحقق', 'كود التحقق',
-
+    'رسالة نصية قصيرة', 'رمز التحقق',
     // Hindi
     'एसएमएस', 'फोन नंबर', 'कोड भेजें', 'फोन पर कोड भेजें',
-    'एसएमएस भेजें', 'संदेश भेजें', 'फोन वेरिफिकेशन', 'वेरिफिकेशन कोड',
-
     // Spanish
-    'mensaje de texto', 'número de teléfono', 'enviar código', 'enviar por teléfono',
-    'enviar sms', 'mensaje', 'código de verificación', 'verificar por teléfono',
-
+    'mensaje de texto', 'número de teléfono', 'enviar código',
     // French
     'par sms', 'message texte', 'numéro de téléphone', 'envoyer le code',
-    'code par sms', 'code de vérification', 'téléphone',
-
     // Indonesian
-    'pesan teks', 'nomor telepon', 'kirim kode', 'kirim melalui telepon',
-    'kirim sms', 'pesan', 'kode verifikasi', 'verifikasi telepon',
-
+    'pesan teks', 'nomor telepon', 'kirim kode', 'kode verifikasi',
     // Turkish
-    'kısa mesaj', 'telefon numarası', 'kod gönder', 'telefonla gönder',
-    'sms gönder', 'mesaj gönder', 'telefon doğrulama', 'doğrulama kodu',
-
+    'kısa mesaj', 'telefon numarası', 'kod gönder',
     // Vietnamese
-    'tin nhắn văn bản', 'số điện thoại', 'gửi mã', 'gửi qua điện thoại',
-    'mã xác thực', 'xác thực qua điện thoại', 'mã sms',
-
+    'tin nhắn văn bản', 'số điện thoại', 'gửi mã', 'mã xác thực',
     // Portuguese
-    'mensagem de texto', 'número de telefone', 'enviar por telefone',
-    'enviar sms', 'código de verificação', 'verificar telefone',
-
+    'mensagem de texto', 'número de telefone', 'código de verificação',
     // German
-    'textnachricht', 'telefonnummer', 'code senden', 'per telefon',
-    'nachricht senden', 'handynummer', 'prüfcode', 'telefonprüfung',
-
+    'textnachricht', 'telefonnummer', 'code senden', 'prüfcode',
     // Russian
-    'смс', 'текстовое сообщение', 'номер телефона', 'отправить смс',
-    'код подтверждения', 'проверка по телефону', 'код через смс',
-
-    // Generic safe patterns
-    'mobile', 'cell', 'text message',
+    'смс', 'текстовое сообщение', 'номер телефона', 'код подтверждения',
+    // Generic
+    'mobile', 'cell',
 ];
 
 const EMAIL_SIGNALS = [
     'email', 'e-mail', 'mail', 'gmail', 'yahoo', 'outlook', 'hotmail',
-    'ইমেইল', 'মেইল', 'ইমেল',
+    'ইমেইল', 'مেইল', 'ইমেল',
     'بريد إلكتروني', 'إيميل',
     'ईमेल',
     'courriel',
@@ -282,7 +260,7 @@ const EMAIL_SIGNALS = [
 const WHATSAPP_SIGNALS = [
     'whatsapp', 'whats app', 'watsapp',
     'واتساب', 'واتس اب',
-    'व्हाट्सएप', 'व्हाट्सएप्प',
+    'व्हाट्सएप',
 ];
 
 const CAPTCHA_PHRASES = [
@@ -297,7 +275,6 @@ const RATELIMIT_PHRASES = [
     'please wait', 'সাময়িকভাবে অবরুদ্ধ',
 ];
 
-// Navigation/action buttons that are NEVER an SMS option
 const HARD_SKIP_TEXTS = [
     'log in', 'login', 'sign in', 'sign up', 'create new account',
     'create account', 'try again', 'reload page', 'back', 'cancel',
@@ -321,6 +298,28 @@ const INPUT_SELECTORS = [
     'input[type="text"]',
 ];
 
+// ── OTP confirmation phrases ──────────────────────────────────────────────────
+const OTP_CONFIRM_PHRASES = [
+    // English
+    'enter the code', 'enter code', '6-digit', 'digit code', 'confirmation code',
+    'we sent', 'we texted', "we've sent", 'sent a code', 'code to', 'sent you a',
+    'enter the 6', 'enter your code', 'check your phone', 'confirm your',
+    // Bengali
+    'কোডটি লিখুন', 'কোড দিন', 'ফোনে পাঠানো', 'কোড পাঠানো', '৬ সংখ্যার',
+    // Arabic
+    'أدخل الرمز', 'رمز التأكيد', 'تم إرسال', 'أرسلنا', 'الرمز المرسل',
+    // Hindi
+    'कोड दर्ज', 'कोड एंटर', 'भेजा गया कोड', '6 अंकों',
+    // Spanish
+    'ingresa el código', 'código enviado', 'te enviamos',
+    // French
+    'entrez le code', 'code envoyé', 'nous vous avons envoyé',
+    // Indonesian
+    'masukkan kode', 'kode yang dikirim', 'kami mengirim',
+    // Russian
+    'введите код', 'код отправлен', 'мы отправили',
+];
+
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
 function isMobileDomain(domain) {
@@ -328,7 +327,6 @@ function isMobileDomain(domain) {
 }
 
 function isPhoneNumberElement(txt) {
-    // Matches masked phone numbers like +937*****260 or +93 780 210 119
     return /^\+?[\d\s\-*().]{7,25}$/.test(txt.trim()) && /\d{3}/.test(txt);
 }
 
@@ -362,8 +360,12 @@ async function findInput(page) {
     return null;
 }
 
-async function clickContinue(page) {
-    const btns = await page.$$('button, [role="button"], input[type="submit"], input[type="button"], a[role="button"]');
+// ── FIXED: clickAndAdvance — used AFTER phone number entry ────────────────────
+// Only clicks the button and confirms we left the identify page.
+// Does NOT check for OTP screen (that's wrong here — we're going to recovery options).
+async function clickAndAdvance(page) {
+    // Selectors: standard buttons + mbasic anchor links (mbasic uses <a> not <button>)
+    const btns = await page.$$('button, [role="button"], input[type="submit"], input[type="button"], a[role="button"], a[href]');
     let clicked = false;
     for (const btn of btns) {
         try {
@@ -374,8 +376,11 @@ async function clickContinue(page) {
             if (!txt) continue;
             if (BLOCKED_WORDS.some(w => txt.includes(w))) continue;
             if (CONTINUE_WORDS.some(w => txt === w || txt.includes(w))) {
+                const navPromise = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
                 await btn.click({ force: true });
+                await navPromise;
                 clicked = true;
+                debug(`clickAndAdvance: clicked "${txt}"`);
                 break;
             }
         } catch (_) { }
@@ -384,22 +389,92 @@ async function clickContinue(page) {
     if (!clicked) {
         const sub = await page.$('button[type="submit"], input[type="submit"]');
         if (sub && await sub.isVisible()) {
+            const navPromise = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
             await sub.click({ force: true });
+            await navPromise;
             clicked = true;
+            debug('clickAndAdvance: clicked submit fallback');
+        }
+    }
+
+    if (!clicked) {
+        debug('clickAndAdvance: no button found');
+        return false;
+    }
+
+    // Wait a brief moment for dynamic elements to settle after navigation
+    try {
+        await sleep(1500);
+
+        const url = page.url();
+        const bodyText = (await page.innerText('body').catch(() => '')).toLowerCase();
+
+        // Check for hard fails
+        if (RATELIMIT_PHRASES.some(w => bodyText.includes(w))) {
+            throw new Error('Rate limit hit after advancing');
+        }
+        if (CAPTCHA_PHRASES.some(w => bodyText.includes(w))) {
+            throw new Error('Captcha required after advancing');
+        }
+
+        // Bad: still on identify page (nothing happened)
+        if (url.includes('/login/identify') && bodyText.includes('find your account')) {
+            debug('clickAndAdvance: still on identify page — button click failed');
+            return false;
+        }
+
+        debug(`clickAndAdvance: advanced to ${url}`);
+        return true;
+    } catch (e) {
+        debug(`clickAndAdvance error: ${e.message}`);
+        if (e.message.includes('Rate limit') || e.message.includes('Captcha')) throw e;
+        return false;
+    }
+}
+
+// ── clickAndVerifyOTP — used AFTER SMS option is selected ────────────────────
+// Clicks the Continue/Submit button and verifies the OTP code screen appeared.
+async function clickAndVerifyOTP(page) {
+    const btns = await page.$$('button, [role="button"], input[type="submit"], input[type="button"], a[role="button"], a[href]');
+    let clicked = false;
+    for (const btn of btns) {
+        try {
+            if (!await btn.isVisible()) continue;
+            const txt = (await btn.innerText().catch(() =>
+                btn.getAttribute('value').catch(() => '')
+            ) || '').toLowerCase().trim();
+            if (!txt) continue;
+            if (BLOCKED_WORDS.some(w => txt.includes(w))) continue;
+            if (CONTINUE_WORDS.some(w => txt === w || txt.includes(w))) {
+                const navPromise = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
+                await btn.click({ force: true });
+                await navPromise;
+                clicked = true;
+                debug(`clickAndVerifyOTP: clicked "${txt}"`);
+                break;
+            }
+        } catch (_) { }
+    }
+
+    if (!clicked) {
+        const sub = await page.$('button[type="submit"], input[type="submit"]');
+        if (sub && await sub.isVisible()) {
+            const navPromise = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
+            await sub.click({ force: true });
+            await navPromise;
+            clicked = true;
+            debug('clickAndVerifyOTP: clicked submit fallback');
         }
     }
 
     if (!clicked) return false;
 
-    // Wait for the next page to load and verify the OTP step
-    debug('Clicked continue, waiting for navigation and verification...');
+    debug('clickAndVerifyOTP: waiting for OTP screen...');
     try {
-        await page.waitForLoadState('domcontentloaded', { timeout: 10000 });
-        await sleep(2000); // give it time to render errors if any
+        await sleep(1500);
 
         const bodyText = (await page.innerText('body').catch(() => '')).toLowerCase();
 
-        // Check for rate limits or errors that occurred AFTER clicking continue
         if (RATELIMIT_PHRASES.some(w => bodyText.includes(w))) {
             throw new Error('Rate limit hit after SMS request');
         }
@@ -407,37 +482,35 @@ async function clickContinue(page) {
             throw new Error('Captcha required after SMS request');
         }
 
-        // Verify that the page actually asks for a code now (OTP successful)
-        const codeInput = await page.$('input[name="n"], input[name="c"], input[type="text"], input[type="number"], input[placeholder*="code" i]');
-        const codeTextPresent = ['code', '8-digit', '6-digit', 'enter', 'check your phone'].some(w => bodyText.includes(w));
+        // Must be OTP code input — strict check
+        const codeInput = await page.$('input[name="n"], input[name="c"], input[placeholder*="code" i]');
+        const codeTextPresent = OTP_CONFIRM_PHRASES.some(w => bodyText.includes(w));
 
         if (codeInput || codeTextPresent) {
-            debug('Verified OTP code input screen');
+            debug('clickAndVerifyOTP: OTP screen confirmed ✓');
             return true;
         }
 
-        debug('Failed to verify OTP screen after clicking continue');
+        debug('clickAndVerifyOTP: OTP screen did NOT appear');
         return false;
     } catch (e) {
-        debug(`Error verifying continue click: ${e.message}`);
+        debug(`clickAndVerifyOTP error: ${e.message}`);
         throw e;
     }
 }
 
 // ── Smart page-settle wait ────────────────────────────────────────────────────
-// Waits until visible interactive element count stabilises (>=2) or timeout.
-// Fixes the race condition where we scan while the page is still rendering.
 async function waitForPageSettle(page, context) {
     const selector = 'button, [role="button"], [role="radio"], a, li, label, input[type="radio"]';
-    const MIN_COUNT = 2;    // page must have at least this many visible elements
-    const STABLE_MS = 600;  // how long count must not change
+    const MIN_COUNT = 2;
+    const STABLE_MS = 600;
     const MAX_WAIT = 4000;
     const POLL_MS = 300;
     const start = Date.now();
     let prevCount = -1;
     let stableFor = 0;
 
-    await sleep(500); // minimum initial wait
+    await sleep(500);
 
     while (Date.now() - start < MAX_WAIT) {
         try {
@@ -458,7 +531,6 @@ async function waitForPageSettle(page, context) {
                     prevCount = visibleCount;
                 }
             } else {
-                // Still loading — reset
                 stableFor = 0;
                 prevCount = -1;
             }
@@ -484,7 +556,6 @@ async function dismissPasswordModal(page) {
                 const txt = (await btn.innerText().catch(() => '')).toLowerCase().trim();
                 const aria = (await btn.getAttribute('aria-label').catch(() => '') || '').toLowerCase();
                 if (dismissTexts.some(w => txt === w || txt.includes(w) || aria.includes(w))) {
-                    debug(`Dismissing password modal via: "${txt || aria}"`);
                     await btn.click({ force: true });
                     await sleep(600);
                     const stillThere = await page.$('[role="dialog"][aria-modal="true"]');
@@ -498,30 +569,39 @@ async function dismissPasswordModal(page) {
     } catch (_) { return false; }
 }
 
-// ── Language-agnostic structure-based SMS detection ───────────────────────────
-// Facebook's aria-labels are consistently in English across all page languages.
-async function detectSMSByStructure(page) {
+// ── Structure-based SMS detection ─────────────────────────────────────────────
+async function detectSMSByStructure(page, targetNumber) {
     try {
         const candidates = await page.$$('[role="radio"], [role="button"], button, li, label, input[type="radio"]');
+        let fallbackSmsEl = null;
+
         for (const el of candidates) {
             if (!await el.isVisible()) continue;
             const aria = (await el.getAttribute('aria-label').catch(() => '') || '').toLowerCase();
             const txt = (await el.innerText().catch(() => '')).toLowerCase().trim();
 
-            const isSmsAria = aria.includes('sms') || aria.includes('text message') ||
-                aria.includes('get code via sms') || aria.includes('get code or link via sms');
-            const isSmsText = txt.includes('sms') || txt.includes('text message');
+            const isSmsAria = SMS_SIGNALS.some(s => aria.includes(s));
+            const isSmsText = SMS_SIGNALS.some(s => txt.includes(s));
 
-            const isWhatsapp = aria.includes('whatsapp') || txt.includes('whatsapp');
-            const isEmail = aria.includes('email') || txt.includes('email') || txt.includes('@');
-            const isNotif = aria.includes('notification') || txt.includes('notification');
-            const isPassword = aria.includes('password') || txt.includes('password');
+            const isWhatsapp = WHATSAPP_SIGNALS.some(s => aria.includes(s) || txt.includes(s));
+            const isEmail = EMAIL_SIGNALS.some(s => aria.includes(s) || txt.includes(s));
+
+            const isNotif = aria.includes('notification') || txt.includes('notification') || aria.includes('facebook') || txt.includes('ফেসবুক') || txt.includes('إشعار');
+            const isPassword = aria.includes('password') || txt.includes('password') || txt.includes('سري') || txt.includes('كلمة') || txt.includes('سیسم') || txt.includes('পাসওয়ার্ড');
 
             if ((isSmsAria || isSmsText) && !isWhatsapp && !isEmail && !isNotif && !isPassword) {
-                debug(`Structure-detected SMS: aria="${aria.slice(0, 60)}" txt="${txt.slice(0, 40)}"`);
-                return el;
+                const targetSuffix = targetNumber ? targetNumber.slice(-2) : 'XX';
+                if (txt.includes(targetSuffix) || aria.includes(targetSuffix)) {
+                    debug(`Structure-detected SMS (exact suffix match for ${targetSuffix}): aria="${aria.slice(0, 60)}" txt="${txt.slice(0, 40)}"`);
+                    return el;
+                }
+                if (!fallbackSmsEl) {
+                    debug(`Structure-detected SMS (generic match): aria="${aria.slice(0, 60)}" txt="${txt.slice(0, 40)}"`);
+                    fallbackSmsEl = el;
+                }
             }
         }
+        return fallbackSmsEl;
     } catch (e) {
         debug(`Structure detection error: ${e.message}`);
     }
@@ -529,28 +609,7 @@ async function detectSMSByStructure(page) {
 }
 
 // ── OTP confirmation screen verifier ─────────────────────────────────────────
-// Returns true only if Facebook actually loaded the 'Enter code' screen after clicking Continue
 async function verifyOTPScreenAppeared(page) {
-    const OTP_CONFIRM_PHRASES = [
-        // English
-        'enter the code', 'enter code', '6-digit', 'digit code', 'confirmation code',
-        'we sent', 'we texted', 'we\'ve sent', 'sent a code', 'code to', 'sent you a',
-        'enter the 6', 'enter your code', 'check your phone', 'confirm your',
-        // Bengali
-        'কোডটি লিখুন', 'কোড দিন', 'ফোনে পাঠানো', 'কোড পাঠানো', '৬ সংখ্যার',
-        // Arabic
-        'أدخل الرمز', 'رمز التأكيد', 'تم إرسال', 'أرسلنا', 'الرمز المرسل',
-        // Hindi
-        'कोड दर्ज', 'कोड एंटर', 'भेजा गया कोड', '6 अंकों',
-        // Spanish
-        'ingresa el código', 'código enviado', 'te enviamos', 'código de confirmación',
-        // French
-        'entrez le code', 'code envoyé', 'nous vous avons envoyé', 'code à',
-        // Indonesian
-        'masukkan kode', 'kode yang dikirim', 'kami mengirim', 'kode verifikasi',
-        // Russian
-        'введите код', 'код отправлен', 'мы отправили', 'код подтверждения',
-    ];
     const maxWait = 10000;
     const pollInterval = 500;
     const start = Date.now();
@@ -568,14 +627,60 @@ async function verifyOTPScreenAppeared(page) {
     return false;
 }
 
+// ── Multiple-account selection ────────────────────────────────────────────────
+// When Facebook shows a list of accounts matching the phone number,
+// scan each row, select the one with an SMS recovery option (not email-only),
+// then proceed. Returns true if an account was selected.
+async function selectBestAccountForSMS(page) {
+    try {
+        // Common account-row selectors on mbasic / m / www
+        const accountRows = await page.$$('[data-sigil="account"], [role="listitem"] a, ul.uiList li a, .account-selection-list a');
+        if (accountRows.length === 0) return false;
+
+        debug(`Found ${accountRows.length} account rows — scanning for SMS recovery`);
+
+        // Fast path: try each row and look for SMS indicator
+        for (const row of accountRows) {
+            try {
+                if (!await row.isVisible()) continue;
+                const txt = (await row.innerText().catch(() => '')).toLowerCase();
+
+                // Skip rows that look email-only
+                if (EMAIL_SIGNALS.some(s => txt.includes(s)) && !SMS_SIGNALS.some(s => txt.includes(s))) {
+                    debug(`Account row skipped (email-only): ${txt.slice(0, 40)}`);
+                    continue;
+                }
+
+                // Click this row
+                debug(`Selecting account row: ${txt.slice(0, 60)}`);
+                await row.click();
+                await sleep(1500);
+                return true;
+            } catch (_) { }
+        }
+
+        // Fallback: click first visible row
+        for (const row of accountRows) {
+            if (!await row.isVisible().catch(() => false)) continue;
+            const txt = (await row.innerText().catch(() => '')).slice(0, 40);
+            debug(`Account fallback: selecting first row: ${txt}`);
+            await row.click();
+            await sleep(1500);
+            return true;
+        }
+    } catch (e) {
+        debug(`selectBestAccountForSMS error: ${e.message}`);
+    }
+    return false;
+}
+
 // ── Main SMS finder ───────────────────────────────────────────────────────────
-async function trySMSAndContinue(page) {
-    // ── Step 0: Dismiss any password modal ──
+async function trySMSAndContinue(page, targetNumber) {
+    // Step 0: Dismiss any password modal
     await dismissPasswordModal(page);
 
-    // ── Step 1: Fast path — language-agnostic structure detection ──
-    // Uses Facebook's always-English aria-labels to find SMS (works on ALL locales)
-    const structureSms = await detectSMSByStructure(page);
+    // Step 1: Fast path — structure-based detection
+    const structureSms = await detectSMSByStructure(page, targetNumber);
     if (structureSms) {
         debug('Structure-based SMS detected, clicking...');
         await dismissPasswordModal(page);
@@ -584,38 +689,36 @@ async function trySMSAndContinue(page) {
         } catch (_) {
             try { await structureSms.click({ force: true, timeout: 3000 }); } catch (_) { }
         }
-        await sleep(2500); // Increased wait time to ensure radio button selection registers
+        await sleep(2500);
         await dismissPasswordModal(page);
-        if (await clickContinue(page)) {
-            debug('Structure-based SMS submitted, verifying OTP screen...');
-            return await verifyOTPScreenAppeared(page);
+        if (await clickAndVerifyOTP(page)) {
+            debug('Structure-based SMS submitted, OTP screen confirmed');
+            return true;
         }
     }
 
-    // ── Step 2: Check if SMS radio already selected ──
+    // Step 2: Check if SMS radio already selected
     try {
         const checked = await page.$('input[type="radio"]:checked');
         if (checked) {
             const label = await page.$('label:has(input[type="radio"]:checked)');
             const lbl = label ? (await label.innerText().catch(() => '')).toLowerCase() : '';
-            debug(`Already selected option: ${lbl}`);
-            // Guard: never treat email/WhatsApp/notification pre-selection as SMS
             const isNonSms = ['email', 'whatsapp', 'notification', 'facebook notification',
                 'password', 'authenticator'].some(w => lbl.includes(w));
             if (!isNonSms && SMS_SIGNALS.some(s => lbl.includes(s))) {
                 debug('SMS already selected, continuing');
                 await sleep(300);
-                if (await clickContinue(page)) return await verifyOTPScreenAppeared(page);
+                if (await clickAndVerifyOTP(page)) return true;
             }
             if (!isNonSms && !['whatsapp', 'email', 'authenticator', 'app', 'google', 'microsoft'].some(w => lbl.includes(w))) {
                 debug('Generic option selected, trying to continue');
                 await sleep(300);
-                if (await clickContinue(page)) return await verifyOTPScreenAppeared(page);
+                if (await clickAndVerifyOTP(page)) return true;
             }
         }
     } catch (_) { }
 
-    // ── Step 3: Main scan — innerText + aria-label ONLY (no innerHTML contamination) ──
+    // Step 3: Full element scan
     debug('Searching for SMS options...');
     const candidates = await page.$$('input[type="radio"], [role="radio"], button, [role="button"], a, li, div[tabindex], label');
     debug(`Found ${candidates.length} potential elements to check`);
@@ -627,117 +730,96 @@ async function trySMSAndContinue(page) {
             const aria = (await el.getAttribute('aria-label').catch(() => '') || '').toLowerCase().trim();
             const title = (await el.getAttribute('title').catch(() => '') || '').toLowerCase().trim();
 
-            debug(`Checking element: text="${txt.slice(0, 60)}", aria="${aria.slice(0, 60)}"`);
-
-            // ── Handle "See More" / "Try another way" FIRST (before any skip filters) ──
+            // Expand "see more" first
             if (['see more', 'more options', 'more ways'].some(s => txt === s || aria === s)) {
-                debug(`Expanding "see more" to reveal hidden recovery options`);
+                debug('Expanding "see more"');
                 try {
                     await el.click();
                     await waitForPageSettle(page, 'see more');
                     await dismissPasswordModal(page);
-                    debug('Re-scanning after "see more" expansion...');
-                    return await trySMSAndContinue(page);
-                } catch (e) { debug(`Error clicking see more: ${e.message.split('\n')[0]}`); }
+                    return await trySMSAndContinue(page, targetNumber);
+                } catch (e) { debug(`see more error: ${e.message.split('\n')[0]}`); }
                 continue;
             }
 
             if (['try another way', 'use another method', 'other options'].some(s => txt === s || aria === s)) {
-                debug(`Clicking "try another way" to find SMS`);
+                debug('Clicking "try another way"');
                 try {
                     await el.click();
                     await waitForPageSettle(page, 'try another way');
                     await dismissPasswordModal(page);
-                    return await trySMSAndContinue(page);
-                } catch (e) { debug(`Error clicking try another way: ${e.message.split('\n')[0]}`); }
+                    return await trySMSAndContinue(page, targetNumber);
+                } catch (e) { debug(`try another way error: ${e.message.split('\n')[0]}`); }
                 continue;
             }
 
-            // ── Hard skip: nav buttons ──
-            if (HARD_SKIP_TEXTS.some(w => txt === w || aria === w)) {
-                debug(`Skipping nav button: "${txt || aria}"`);
-                continue;
-            }
+            if (HARD_SKIP_TEXTS.some(w => txt === w || aria === w)) continue;
+            if (WHATSAPP_SIGNALS.some(s => txt.includes(s) || aria.includes(s))) continue;
+            if (EMAIL_SIGNALS.some(s => txt.includes(s) || aria.includes(s))) continue;
+            if (['authenticator', 'google authenticator', 'microsoft authenticator', 'github'].some(s => txt.includes(s) || aria.includes(s))) continue;
+            if (['facebook notification', 'logged in on another device'].some(s => txt.includes(s) || aria.includes(s))) continue;
 
-            // ── Skip WhatsApp ──
-            if (WHATSAPP_SIGNALS.some(s => txt.includes(s) || aria.includes(s))) {
-                debug(`Skipping WhatsApp option: "${txt.slice(0, 40)}"`);
-                continue;
-            }
-
-            // ── Skip email ──
-            if (EMAIL_SIGNALS.some(s => txt.includes(s) || aria.includes(s))) {
-                debug(`Skipping email option: "${txt.slice(0, 40)}"`);
-                continue;
-            }
-
-            // ── Skip authenticator apps ──
-            if (['authenticator', 'google authenticator', 'microsoft authenticator', 'github'].some(s => txt.includes(s) || aria.includes(s))) {
-                debug(`Skipping authenticator option: "${txt.slice(0, 40)}"`);
-                continue;
-            }
-
-            // ── Skip Facebook notification recovery ──
-            if (['facebook notification', 'logged in on another device'].some(s => txt.includes(s) || aria.includes(s))) {
-                debug(`Skipping notification option: "${txt.slice(0, 40)}"`);
-                continue;
-            }
-
-            // ── Phone number account-selection buttons ──
-            // After "try another way", Facebook sometimes shows "+937*****260" as a button
+            // Phone number button (after "try another way")
             if (isPhoneNumberElement(txt) && txt.length < 25) {
-                debug(`Phone number button detected: "${txt}" — clicking to proceed`);
+                debug(`Phone number button: "${txt}" — clicking`);
                 try {
                     await el.click();
                     await sleep(1200);
                     await dismissPasswordModal(page);
-                    return await trySMSAndContinue(page);
-                } catch (e) {
-                    debug(`Error clicking phone number button: ${e.message.split('\n')[0]}`);
-                }
+                    return await trySMSAndContinue(page, targetNumber);
+                } catch (e) { debug(`Phone btn error: ${e.message.split('\n')[0]}`); }
                 continue;
             }
 
-            // ── Match SMS option ──
+            // SMS match
             if (SMS_SIGNALS.some(s => txt.includes(s) || aria.includes(s) || title.includes(s))) {
-                debug(`SMS option found: "${txt.slice(0, 60)}" / aria="${aria.slice(0, 60)}"`);
+                const targetSuffix = targetNumber ? targetNumber.slice(-2) : 'XX';
+                const isExact = txt.includes(targetSuffix) || aria.includes(targetSuffix) || title.includes(targetSuffix);
+                
+                debug(`SMS option found (exact=${isExact}): "${txt.slice(0, 60)}" / aria="${aria.slice(0, 60)}"`);
                 await dismissPasswordModal(page);
                 try {
                     await el.click({ timeout: 5000 });
-                } catch (clickErr) {
-                    debug(`Direct click failed — trying force click`);
+                } catch (_) {
                     try { await el.click({ force: true, timeout: 3000 }); } catch (_) { }
                 }
-                await sleep(2500); // Increased wait time to ensure radio button selection registers
-                await dismissPasswordModal(page);
-                if (await clickContinue(page)) {
-                    debug('SMS option successfully submitted, verifying OTP screen...');
-                    return await verifyOTPScreenAppeared(page);
+                
+                // If it's a perfect match, confidently break and process it.
+                // If we aren't sure, we click it but keep scanning just in case a better one exists.
+                if (isExact) {
+                    await sleep(2500);
+                    await dismissPasswordModal(page);
+                    if (await clickAndVerifyOTP(page)) {
+                        debug('SMS submitted, OTP screen confirmed ✓');
+                        return true;
+                    }
+                } else {
+                    // It didn't match the suffix, but we clicked it. We'll give it a shot.
+                    await sleep(1500);
+                    if (await clickAndVerifyOTP(page)) return true;
                 }
             }
         } catch (e) {
-            debug(`Error processing element: ${e.message.split('\n')[0]}`);
+            debug(`Element scan error: ${e.message.split('\n')[0]}`);
         }
     }
 
-    debug('No direct SMS found, trying alternative phone-related elements');
-
-    // ── Step 4: Alternative phone elements ──
+    // Step 4: Alternative phone elements
+    debug('No direct SMS found, trying alternative phone elements');
     const phoneElements = await page.$$('button, [role="button"], a, div[onclick], span[onclick]');
     for (const el of phoneElements) {
         try {
             if (!await el.isVisible()) continue;
             const txt = (await el.innerText().catch(() => '')).toLowerCase();
-            if (['phone', 'mobile', 'cell', 'sms', 'text'].some(s => txt.includes(s)) &&
+            if (SMS_SIGNALS.some(s => txt.includes(s)) &&
                 !BLOCKED_WORDS.some(w => txt.includes(w)) &&
                 !HARD_SKIP_TEXTS.some(w => txt === w)) {
-                debug(`Trying phone-related element: ${txt.slice(0, 40)}`);
+                debug(`Trying phone element: ${txt.slice(0, 40)}`);
                 await el.click();
                 await sleep(800);
                 const bodyText = (await page.innerText('body').catch(() => '')).toLowerCase();
                 if (SMS_SIGNALS.some(s => bodyText.includes(s))) {
-                    debug('Alternative led to SMS options, trying again');
-                    return await trySMSAndContinue(page);
+                    return await trySMSAndContinue(page, targetNumber);
                 }
                 await page.goBack().catch(() => { });
                 await sleep(500);
@@ -750,36 +832,52 @@ async function trySMSAndContinue(page) {
 }
 
 // ── processNumber ─────────────────────────────────────────────────────────────
-async function processNumber(number, domain, userAgent, proxyConfig) {
+// SMS_RESEND_COUNT: how many times to trigger the SMS send (5 times total)
+// All 5 sends use the SAME browser context / SAME IP / SAME UA
+const SMS_RESEND_COUNT = 5;
+const SMS_RESEND_WAIT_MS_MIN = 5000; // 5s min wait before going back
+const SMS_RESEND_WAIT_MS_MAX = 7000; // 7s max wait before going back
+
+async function processNumber(number, domain, userAgent, proxyConfig, language) {
     const mobile = isMobileDomain(domain);
-    // Always generate a fresh UA per task, matched to domain type (ignores pre-selected UA)
+
+    // ── STICKY UA: generate ONE fresh UA at the start, never change it mid-session ──
     const freshUA = generateUA(mobile);
     userAgent = freshUA;
+    debug(`UA for this session: ${freshUA.slice(0, 60)}...`);
+
     let context = null;
     let page = null;
-    let fallbackDirect = false;
 
     try {
         const b = await getBrowser();
         if (!b) return { result: 'error', errorMsg: 'Browser failed to start' };
 
-        // Playwright allows setting proxy per context
+        const localeMap = {
+            'pt': 'pt-BR', 'es': 'es-MX', 'fr': 'fr-FR', 'ar': 'ar-EG',
+            'bn': 'bn-BD', 'id': 'id-ID', 'vi': 'vi-VN', 'tr': 'tr-TR',
+            'ru': 'ru-RU', 'de': 'de-DE', 'hi': 'hi-IN', 'zh': 'zh-CN',
+            'ja': 'ja-JP', 'ko': 'ko-KR', 'en': 'en-US'
+        };
+        const browserLocale = localeMap[language] || 'en-US';
+
+        // ── STICKY IP: proxy is set once at context level, reused for ALL 5 resends ──
         const contextOpts = {
             userAgent,
-            locale: 'en-US',
+            locale: browserLocale,
             timezoneId: 'Asia/Dhaka',
             viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 800 },
             isMobile: mobile,
             hasTouch: mobile,
             ignoreHTTPSErrors: true,
-            extraHTTPHeaders: { 'Accept-Language': 'en-US,en;q=0.9' },
+            extraHTTPHeaders: { 'Accept-Language': `${browserLocale},${language};q=0.9,en-US;q=0.8,en;q=0.7` },
             proxy: proxyConfig || undefined
         };
         context = await b.newContext(contextOpts);
         page = await context.newPage();
 
         if (proxyConfig) {
-            debug(`Context created with proxy: ${proxyConfig.server}`);
+            debug(`Context created with proxy: ${proxyConfig.server} (sticky for all resends)`);
         }
 
         // Block images/fonts for speed
@@ -791,11 +889,10 @@ async function processNumber(number, domain, userAgent, proxyConfig) {
         try {
             await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
             navOk = true;
-            debug(`Navigation succeeded with timeout: 20000ms, waitUntil: domcontentloaded`);
+            debug(`Navigation succeeded`);
         } catch (e) {
-            debug(`Navigation failed: timeout=20000ms, waitUntil=domcontentloaded, error=${e.message}`);
+            debug(`Navigation failed: ${e.message.split('\n')[0]}`);
 
-            // ── Network-down detection: pause and wait, don't discard ──
             const isNetworkDown =
                 e.message.includes('ERR_NAME_NOT_RESOLVED') ||
                 e.message.includes('ERR_INTERNET_DISCONNECTED') ||
@@ -803,25 +900,23 @@ async function processNumber(number, domain, userAgent, proxyConfig) {
                 e.message.includes('ERR_ADDRESS_UNREACHABLE');
 
             if (isNetworkDown) {
-                debug(`Network appears down — pausing up to 3 min and retrying same page...`);
-                const maxWait = 3 * 60 * 1000; // 3 minutes
-                const pollInterval = 10000;    // check every 10s
+                debug(`Network appears down — pausing up to 3 min and retrying...`);
+                const maxWait = 3 * 60 * 1000;
+                const pollInterval = 10000;
                 const waitStart = Date.now();
                 let recovered = false;
                 while (Date.now() - waitStart < maxWait) {
                     await sleep(pollInterval);
                     try {
                         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
-                        debug(`Network recovered after ${Math.round((Date.now() - waitStart) / 1000)}s — resuming`);
+                        debug(`Network recovered after ${Math.round((Date.now() - waitStart) / 1000)}s`);
                         navOk = true;
                         recovered = true;
                         break;
-                    } catch (_) {
-                        debug(`Still waiting for network... (${Math.round((Date.now() - waitStart) / 1000)}s elapsed)`);
-                    }
+                    } catch (_) { }
                 }
                 if (!recovered) {
-                    return { result: 'error', errorMsg: `Network down for 3+ minutes: ${e.message.split('\n')[0]}` };
+                    return { result: 'error', errorMsg: `Network down for 3+ minutes` };
                 }
             }
 
@@ -834,9 +929,8 @@ async function processNumber(number, domain, userAgent, proxyConfig) {
                     e.message.includes('ERR_ABORTED') ||
                     e.message.includes('ERR_SOCKS');
 
-                // Make sure it fails fast if proxy specifically rejects or errors out
                 if (proxyConfig && isProxyError) {
-                    debug(`Proxy failed/timed out — aborting to trigger retry with new proxy.`);
+                    debug(`Proxy failed/timed out — aborting`);
                     return { result: 'error', errorMsg: `Proxy failure: ${e.message.split('\n')[0]}` };
                 }
             }
@@ -844,11 +938,10 @@ async function processNumber(number, domain, userAgent, proxyConfig) {
 
         if (!navOk) {
             try {
-                // If it timed out but wasn't a dead-proxy error, we assume the HTML loaded enough to proceed
                 await page.goto(url, { timeout: 5000, waitUntil: 'commit' }).catch(() => { });
                 await sleep(1000);
                 navOk = true;
-                debug('Final fallback navigation attempt');
+                debug('Final fallback navigation');
             } catch (e) {
                 return { result: 'error', errorMsg: `All navigation attempts failed: ${e.message}` };
             }
@@ -870,6 +963,11 @@ async function processNumber(number, domain, userAgent, proxyConfig) {
 
         const input = await findInput(page);
         if (!input) {
+            try {
+                const dbgUrl = page.url();
+                const dbgTxt = await page.innerText('body').catch(() => 'no text');
+                debug(`[NO_INPUT_DEBUG] URL: ${dbgUrl} | Content: ${dbgTxt.replace(/\\n/g, ' ').substring(0, 500)}`);
+            } catch (e) {}
             await saveScreenshot(page, number, 'failed', 'no_input');
             return { result: 'error', errorMsg: 'Input not found' };
         }
@@ -878,18 +976,18 @@ async function processNumber(number, domain, userAgent, proxyConfig) {
             await input.click({ clickCount: 3, force: true, timeout: 5000 });
         } catch (_) { }
         await input.fill(number, { force: true });
-        await sleep(rand(200, 400));
+        await sleep(rand(300, 600));
 
-        const cont = await clickContinue(page);
-        if (!cont) return { result: 'error', errorMsg: 'Continue not found' };
+        // ── FIXED: use clickAndAdvance (does NOT check OTP here) ──
+        const advanced = await clickAndAdvance(page);
+        if (!advanced) return { result: 'error', errorMsg: 'Continue not found or did not advance' };
 
-        // ── Smart wait: poll until aria="loading..." disappears ──
-        // Replaces fixed 3-5s sleep so we never scan while the page is still processing
+        // Smart wait for recovery options page to load
         {
             const LOAD_POLL = 400;
             const LOAD_MAX = 12000;
             const loadStart = Date.now();
-            await sleep(1200); // minimum wait
+            await sleep(1200);
             while (Date.now() - loadStart < LOAD_MAX) {
                 try {
                     const loadingEl = await page.$('[aria-label="loading..."], [aria-busy="true"], [aria-label*="loading"]');
@@ -900,7 +998,6 @@ async function processNumber(number, domain, userAgent, proxyConfig) {
                 } catch (_) { break; }
                 await sleep(LOAD_POLL);
             }
-            // Extra buffer for DOM to fully render recovery options
             await sleep(rand(800, 1500));
         }
 
@@ -919,64 +1016,87 @@ async function processNumber(number, domain, userAgent, proxyConfig) {
         if (RATELIMIT_PHRASES.some(p => bodyText.includes(p)))
             return { result: 'error', errorMsg: 'rate limit detected' };
 
-        const sent = await trySMSAndContinue(page);
-        if (sent) {
-            debug('OTP #1 confirmed. Attempting 2 more sends for reliability...');
-            await saveScreenshot(page, number, 'success', 'otp_sent_1');
-
-            // ── 3x OTP Send Loop ────────────────────────────────────────────
-            // After first confirmed send, go back and repeat 2 more times.
-            // Facebook sometimes only dispatches the SMS on the 2nd or 3rd trigger.
-            for (let attempt = 2; attempt <= 3; attempt++) {
-                try {
-                    await sleep(3000); // Give Facebook time to process before going back
-                    // Navigate back to the SMS selection page
-                    await page.goBack({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => { });
-                    await sleep(1000);
-                    // Try to send again
-                    const reSent = await trySMSAndContinue(page);
-                    if (reSent) {
-                        debug(`OTP #${attempt} confirmed.`);
-                        await saveScreenshot(page, number, 'success', `otp_sent_${attempt}`);
-                    } else {
-                        debug(`OTP #${attempt} — could not re-trigger SMS, stopping loop.`);
-                        break;
-                    }
-                } catch (e) {
-                    debug(`OTP re-send attempt ${attempt} error: ${e.message.split('\n')[0]}`);
-                    break;
+        // ── Multiple account selection ──
+        // Facebook sometimes shows multiple account rows when the phone matches multiple accounts.
+        // Scan for the one most likely to have SMS recovery.
+        const pageUrl = page.url();
+        if (pageUrl.includes('/recover') && bodyText.includes('choose') ||
+            bodyText.includes('more than one account') ||
+            bodyText.includes('multiple accounts') ||
+            bodyText.includes('which account')) {
+            debug('Multiple accounts detected — selecting best for SMS');
+            const selected = await selectBestAccountForSMS(page);
+            if (selected) {
+                await sleep(rand(1200, 2000));
+                // Re-check for no-account / captcha after selection
+                const newBody = (await page.innerText('body').catch(() => '')).toLowerCase();
+                if (NO_ACCOUNT_PHRASES.some(p => newBody.includes(p))) {
+                    return { result: 'no_account', errorMsg: '' };
                 }
             }
-
-            debug('All OTP sends complete. Waiting 5s before closing...');
-            await sleep(5000);
-            return { result: 'success', errorMsg: '' };
         }
 
-        // ── Fallback: save screenshot then try account-row selection ──
-        debug('Primary SMS attempt failed, trying alternative methods');
-        await saveScreenshot(page, number, 'failed', 'no_sms_primary');
+        // ── 5x SMS Send Loop ─────────────────────────────────────────────────
+        // Find SMS option and trigger it. If confirmed, go back and resend up to 5x total.
+        // Same context (same IP, same UA) used throughout all 5 sends.
+        let successCount = 0;
+        let smsPageUrl = null; // URL of the recovery options page (used to go back)
 
-        try {
-            const sendButtons = await page.$$('button, [role="button"], a');
-            for (const btn of sendButtons) {
-                if (!await btn.isVisible()) continue;
-                const txt = (await btn.innerText().catch(() => '')).toLowerCase();
-                if (['send code', 'send sms', 'send verification'].some(s => txt.includes(s))) {
-                    debug(`Found send code button: ${txt}`);
-                    await btn.click();
-                    await sleep(2000);
-                    const body = (await page.innerText('body').catch(() => '')).toLowerCase();
-                    if (body.includes('sent') || body.includes('code') || body.includes('sms')) {
-                        debug('OTP confirmed via alternative send button. Waiting 5 seconds before closing browser...');
-                        await saveScreenshot(page, number, 'success', 'otp_sent_alt');
-                        await sleep(5000);
-                        return { result: 'success', errorMsg: '' };
+        for (let attempt = 1; attempt <= SMS_RESEND_COUNT; attempt++) {
+            debug(`SMS send attempt ${attempt}/${SMS_RESEND_COUNT}...`);
+
+            // On resend attempts, navigate back to recovery options page
+            if (attempt > 1) {
+                if (smsPageUrl) {
+                    try {
+                        await page.goto(smsPageUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+                        await sleep(rand(SMS_RESEND_WAIT_MS_MIN, SMS_RESEND_WAIT_MS_MAX));
+                        debug(`Resend attempt ${attempt}: navigated back to recovery options`);
+                    } catch (e) {
+                        debug(`Resend attempt ${attempt}: navigation back failed — ${e.message.split('\n')[0]}`);
+                        // Try goBack as fallback
+                        try {
+                            await page.goBack({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => { });
+                            await sleep(rand(SMS_RESEND_WAIT_MS_MIN, SMS_RESEND_WAIT_MS_MAX));
+                        } catch (_) { }
                     }
+                } else {
+                    debug(`Resend attempt ${attempt}: no saved page URL, using goBack`);
+                    await page.goBack({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => { });
+                    await sleep(rand(SMS_RESEND_WAIT_MS_MIN, SMS_RESEND_WAIT_MS_MAX));
                 }
+            } else {
+                // First attempt: save the recovery options page URL for later navigation
+                smsPageUrl = page.url();
+                debug(`Recovery options page URL saved: ${smsPageUrl}`);
             }
-        } catch (_) { }
 
+            const sent = await trySMSAndContinue(page, number);
+            if (sent) {
+                successCount++;
+                debug(`OTP send #${attempt} confirmed ✓`);
+                await saveScreenshot(page, number, 'success', `otp_sent_${attempt}`);
+
+                // Stay on OTP screen for 5-7s before going back for next resend
+                if (attempt < SMS_RESEND_COUNT) {
+                    const stayMs = rand(SMS_RESEND_WAIT_MS_MIN, SMS_RESEND_WAIT_MS_MAX);
+                    debug(`Staying on OTP screen for ${stayMs}ms before resend ${attempt + 1}...`);
+                    await sleep(stayMs);
+                }
+            } else {
+                debug(`SMS send attempt ${attempt} failed — stopping resend loop`);
+                break;
+            }
+        }
+
+        if (successCount > 0) {
+            debug(`All ${successCount} OTP sends complete. Waiting 5s before closing...`);
+            await sleep(5000);
+            return { result: 'success', errorMsg: '', sendCount: successCount };
+        }
+
+        // No SMS found
+        await saveScreenshot(page, number, 'failed', 'no_sms_primary');
         return { result: 'no_sms', errorMsg: '' };
 
     } catch (err) {
@@ -997,17 +1117,18 @@ parentPort.on('message', async (msg) => {
         await loadPlaywright();
         const { number, proxy, domain, userAgent, language } = msg;
 
-        const safeDomain = (domain && typeof domain === 'string') ? domain : 'https://www.facebook.com';
+        const safeDomain = (domain && typeof domain === 'string') ? domain : 'https://mbasic.facebook.com';
         debug(`Processing ${number} with domain: ${safeDomain}`);
 
         const proxyConfig = proxy ? parseProxy(proxy) : null;
         if (proxy && !proxyConfig) {
-            debug(`Invalid proxy format: ${proxy}, falling back to direct connection`);
+            debug(`Invalid proxy format: ${proxy}, falling back to direct`);
         }
 
-        const { result, errorMsg } = await processNumber(number, safeDomain, userAgent, proxyConfig);
-        parentPort.postMessage({ type: 'result', number, result, errorMsg, language,
-            // Report the proxy back so main thread can blacklist it on failure
+        const { result, errorMsg, sendCount } = await processNumber(number, safeDomain, userAgent, proxyConfig, language);
+        parentPort.postMessage({
+            type: 'result', number, result, errorMsg, language,
+            sendCount: sendCount || 0,
             proxy: proxyConfig ? proxyConfig.server : null
         });
     } catch (err) {
