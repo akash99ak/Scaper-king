@@ -1,13 +1,15 @@
 @echo off
 setlocal enabledelayedexpansion
-title FB Recovery OTP Autofill
-color 0B
+title Scraper-King V-1.0
+color 0A
 
 cd /d "%~dp0"
 
 echo.
 echo   =========================================
-echo    FB RECOVERY OTP AUTOFILL
+echo    Scraper-King 
+echo.
+echo    V-1.0
 echo   =========================================
 echo.
 timeout /t 1 >nul
@@ -62,7 +64,7 @@ if not exist "%~dp0node_modules\playwright-extra" (
 :ask_numbers
 cls
 echo.
-echo   FB RECOVERY AUTOFILL
+echo   Scraper-King V-1.0
 echo   -----------------------------------------
 echo   Step 1: Target List
 echo.
@@ -99,7 +101,7 @@ if !errorlevel! equ 0 (
 :ask_proxy
 cls
 echo.
-echo   FB RECOVERY AUTOFILL
+echo   Scraper-King V-1.0
 echo   -----------------------------------------
 echo   Step 2: Proxy Method
 echo.
@@ -153,7 +155,7 @@ goto ask_workers
 :ask_workers
 cls
 echo.
-echo   FB RECOVERY AUTOFILL
+echo   Scraper-King V-1.0
 echo   -----------------------------------------
 echo   Step 3: Workers
 echo.
@@ -166,7 +168,7 @@ set /p "WORKERS=  > Number of workers (Enter to auto-detect): "
 :ask_language
 cls
 echo.
-echo   FB RECOVERY AUTOFILL
+echo   Scraper-King V-1.0
 echo   -----------------------------------------
 echo   Step 4: Languages
 echo.
@@ -182,7 +184,7 @@ if "!LANG_MODE!"=="2" goto multi_language
 :single_language
 cls
 echo.
-echo   FB RECOVERY AUTOFILL
+echo   Scraper-King V-1.0
 echo   -----------------------------------------
 echo   Select Language:
 echo.
@@ -209,7 +211,7 @@ goto language_done
 :multi_language
 cls
 echo.
-echo   FB RECOVERY AUTOFILL
+echo   Scraper-King V-1.0
 echo   -----------------------------------------
 echo   Multi-Language Selection
 echo.
