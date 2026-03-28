@@ -1,4 +1,4 @@
 {
   "version": "1.0.0",
-  "files": ["autofill.js", "worker.js", "autofill.bat"]
+  "files": ["autofill.js", "worker.js", "autofill.bat", "proxyTester.js"]
 }
