@@ -8,8 +8,8 @@ for /f %%a in ('echo prompt $E ^| cmd') do set "E=%%a"
 
 cd /d "%~dp0"
 
-:: ── License key passed from Launcher ─────────────────────────
-set "LICENSE_KEY=%~1"
+:: ── Developer Mode (No License) ─────────────────────────
+set "LICENSE_KEY=DEV_MODE"
 
 :: ── ASCII Art Header ─────────────────────────────────────────
 :show_header
@@ -23,9 +23,7 @@ echo   %E%[36m==================================================%E%[0m
 echo   %E%[32m[+]%E%[37m FB Recovery OTP Autofill Engine%E%[0m
 echo   %E%[32m[+]%E%[37m Developer  : %E%[33mScraper-King%E%[0m
 echo   %E%[32m[+]%E%[37m Contact    : %E%[33mhttps://t.me/scraper_king%E%[0m
-if defined LICENSE_KEY (
-echo   %E%[32m[+]%E%[37m License    : %E%[33m!LICENSE_KEY:~0,15!...%E%[0m
-)
+echo   %E%[32m[+]%E%[37m Mode       : %E%[33mDeveloper (No Key)%E%[0m
 echo   %E%[33m[~] Auto Logging : Under Development%E%[0m
 echo   %E%[36m==================================================%E%[0m
 echo.
@@ -62,7 +60,7 @@ if not exist "%~dp0node_modules\playwright-extra" (
     echo.
     echo  %E%[33m[*] Installing required Node packages...%E%[0m
     echo.
-    call "!NPM_CMD!" install playwright playwright-extra puppeteer-extra-plugin-stealth
+    call "!NPM_CMD!" install playwright playwright-extra puppeteer-extra-plugin-stealth axios socks-proxy-agent
     if !errorlevel! neq 0 (
         echo  %E%[31m[~] Install failed. Check your internet connection.%E%[0m
         pause
@@ -119,40 +117,33 @@ echo   %E%[36m==================================================%E%[0m
 echo   %E%[32m  SCRAPER KING%E%[37m -- Step 2: Proxy Method%E%[0m
 echo   %E%[36m==================================================%E%[0m
 echo.
-echo   %E%[32m[1]%E%[37m Auto Scraping (Free + Premium)%E%[0m
-echo   %E%[32m[2]%E%[37m VPN / Mobile Data (No Timeout)%E%[0m
-echo   %E%[32m[3]%E%[37m Custom File%E%[0m
-echo   %E%[32m[4]%E%[37m Direct Connection (No Proxy)%E%[0m
-echo.
-set "PROXY_CHOICE="
-set /p "PROXY_CHOICE=  %E%[32m>%E%[37m Choice [1-4] (Default 1): %E%[0m"
-if "!PROXY_CHOICE!"=="" set "PROXY_CHOICE=1"
+    echo   %E%[32m[1]%E%[37m Auto Scraping (Proxies)%E%[0m
+    echo   %E%[32m[2]%E%[37m VPN / Mobile Data (No Timeout)%E%[0m
+    echo   %E%[32m[3]%E%[37m Custom File%E%[0m
+    echo   %E%[32m[4]%E%[37m Direct Connection (No Proxy)%E%[0m
+    echo.
+    set "PROXY_CHOICE="
+    set /p "PROXY_CHOICE=  %E%[32m>%E%[37m Choice [1-4] (Default 1): %E%[0m"
+    if "!PROXY_CHOICE!"=="" set "PROXY_CHOICE=1"
 
-if "!PROXY_CHOICE!"=="1" goto auto_proxy
-if "!PROXY_CHOICE!"=="2" goto vpn_proxy
-if "!PROXY_CHOICE!"=="3" goto custom_proxy
-if "!PROXY_CHOICE!"=="4" goto direct_proxy
-if "!PROXY_CHOICE!"=="5" goto premium_proxy
-goto ask_proxy
+    if "!PROXY_CHOICE!"=="1" goto auto_proxy
+    if "!PROXY_CHOICE!"=="2" goto vpn_proxy
+    if "!PROXY_CHOICE!"=="3" goto custom_proxy
+    if "!PROXY_CHOICE!"=="4" goto direct_proxy
+    goto ask_proxy
 
 :auto_proxy
-set "PROXY_CHOICE=auto"
-set "PROXY_FILE="
-set "PROXY_STATUS=Auto (Free + Premium)"
-goto ask_proxy_country
-
-:premium_proxy
-set "PROXY_CHOICE=premium"
-set "PROXY_FILE="
-set "PROXY_STATUS=Premium Proxy"
-goto ask_proxy_country
+    set "PROXY_CHOICE=auto"
+    set "PROXY_FILE="
+    set "PROXY_STATUS=Auto (Public Proxies)"
+    goto ask_proxy_country
 
 :vpn_proxy
-set "PROXY_CHOICE=vpn"
-set "PROXY_FILE="
-set "PROXY_COUNTRY=none"
-set "PROXY_STATUS=VPN / Mobile Data (No Timeout)"
-goto ask_workers
+    set "PROXY_CHOICE=vpn"
+    set "PROXY_FILE="
+    set "PROXY_COUNTRY=none"
+    set "PROXY_STATUS=VPN / Mobile Data (No Timeout)"
+    goto ask_workers
 
 :ask_proxy_country
 cls
@@ -172,11 +163,11 @@ if "!COUNTRY_CHOICE!"=="" set "COUNTRY_CHOICE=1"
 
 if "!COUNTRY_CHOICE!"=="1" (
     set "PROXY_COUNTRY=auto_detect"
-    goto ask_workers
+    goto ask_proxy_timing
 )
 if "!COUNTRY_CHOICE!"=="2" (
     set "PROXY_COUNTRY=all"
-    goto ask_workers
+    goto ask_proxy_timing
 )
 if "!COUNTRY_CHOICE!"=="3" (
     cls
@@ -202,7 +193,7 @@ if "!COUNTRY_CHOICE!"=="3" (
 set "PROXY_COUNTRY="
 set /p "PROXY_COUNTRY=  %E%[32m>%E%[37m Enter 2-Letter Code: %E%[0m"
 if "!PROXY_COUNTRY!"=="" set "PROXY_COUNTRY=auto_detect"
-goto ask_workers
+goto ask_proxy_timing
 
 :custom_proxy
 echo.
@@ -214,23 +205,52 @@ set "PROXY_FILE=!PROXY_FILE:"=!"
 if "!PROXY_FILE!"=="" (
     set "PROXY_CHOICE=direct"
     set "PROXY_STATUS=Direct (No file provided)"
+    set "PROXY_USE_LIMIT=1"
     goto ask_workers
 )
 if not exist "!PROXY_FILE!" (
     set "PROXY_CHOICE=direct"
     set "PROXY_STATUS=Direct (File not found)"
+    set "PROXY_USE_LIMIT=1"
     goto ask_workers
 )
 
 set "PROXY_CHOICE=custom"
 set "PROXY_STATUS=Custom File (!PROXY_FILE!)"
-goto ask_workers
+
+echo.
+echo   %E%[37m  How many times should each proxy be used before moving to the next?%E%[0m
+set "PROXY_USE_LIMIT="
+set /p "PROXY_USE_LIMIT=  %E%[32m>%E%[37m Usages per proxy (Default 1): %E%[0m"
+if "!PROXY_USE_LIMIT!"=="" set "PROXY_USE_LIMIT=1"
+
+goto ask_proxy_timing
 
 :direct_proxy
 set "PROXY_CHOICE=direct"
 set "PROXY_FILE="
 set "PROXY_COUNTRY=all"
 set "PROXY_STATUS=Direct Connection"
+goto ask_workers
+
+:: ── STEP 2.8: Proxy Timing ────────────────────────────────────────
+:ask_proxy_timing
+cls
+echo.
+echo   %E%[36m==================================================%E%[0m
+echo   %E%[32m  SCRAPER KING%E%[37m -- Step 2.8: When to connect proxy?%E%[0m
+echo   %E%[36m==================================================%E%[0m
+echo.
+echo   %E%[32m[1]%E%[37m From the start (Browser is completely proxy covered)%E%[0m
+echo   %E%[32m[2]%E%[37m When the SMS option is found (Fast, uses local IP first)%E%[0m
+echo.
+set "PROXY_TIMING_CHOICE="
+set /p "PROXY_TIMING_CHOICE=  %E%[32m>%E%[37m Choice [1-2] (Default 1): %E%[0m"
+if "!PROXY_TIMING_CHOICE!"=="" set "PROXY_TIMING_CHOICE=1"
+
+if "!PROXY_TIMING_CHOICE!"=="1" set "PROXY_TIMING=early"
+if "!PROXY_TIMING_CHOICE!"=="2" set "PROXY_TIMING=late"
+
 goto ask_workers
 
 :: ── STEP 3: Worker Configuration ────────────────────────────────
@@ -347,12 +367,102 @@ goto :eof
 
 :language_done
 
-:: ── STEP 5: OTP Resend Configuration ──────────────────────────
+:: ── STEP 5: URL Selection ─────────────────────────────────────
+:ask_urls
+cls
+echo.
+echo   %E%[36m==================================================%E%[0m
+echo   %E%[32m  SCRAPER KING%E%[37m -- Step 5: Target URLs%E%[0m
+echo   %E%[36m==================================================%E%[0m
+echo.
+echo   %E%[32m[1]%E%[37m Auto (All available URLs for selected language)%E%[0m
+echo   %E%[32m[2]%E%[37m Select specific URLs%E%[0m
+echo.
+set "URL_MODE="
+set /p "URL_MODE=  %E%[32m>%E%[37m Choice [1-2] (Default 1): %E%[0m"
+if "!URL_MODE!"=="" set "URL_MODE=1"
+
+if "!URL_MODE!"=="1" (
+    set "CUSTOM_URLS="
+    goto ask_resends
+)
+
+:select_urls
+cls
+echo.
+echo   %E%[36m==================================================%E%[0m
+echo   %E%[32m  SCRAPER KING%E%[37m -- Select Target URLs%E%[0m
+echo   %E%[36m==================================================%E%[0m
+echo.
+echo   %E%[37m   1: www.facebook.com          (Desktop)%E%[0m
+echo   %E%[37m   2: m.facebook.com            (Mobile)%E%[0m
+echo   %E%[37m   3: mbasic.facebook.com       (Basic Mobile)%E%[0m
+echo   %E%[37m   4: touch.facebook.com        (Touch Mobile)%E%[0m
+echo   %E%[37m   5: free.facebook.com         (Free/Lite)%E%[0m
+echo   %E%[37m   6: es-es.facebook.com        (Spanish Desktop)%E%[0m
+echo   %E%[37m   7: fr-fr.facebook.com        (French Desktop)%E%[0m
+echo   %E%[37m   8: de-de.facebook.com        (German Desktop)%E%[0m
+echo   %E%[37m   9: pt-br.facebook.com        (Portuguese Desktop)%E%[0m
+echo   %E%[37m  10: it-it.facebook.com        (Italian Desktop)%E%[0m
+echo   %E%[37m  11: ar-ar.facebook.com        (Arabic Desktop)%E%[0m
+echo   %E%[37m  12: hi-in.facebook.com        (Hindi Desktop)%E%[0m
+echo   %E%[37m  13: id-id.facebook.com        (Indonesian Desktop)%E%[0m
+echo   %E%[37m  14: ru-ru.facebook.com        (Russian Desktop)%E%[0m
+echo.
+echo   %E%[37m  Example: "1,2,3" or "1-5" or "2"%E%[0m
+echo.
+set "URL_SELECTION="
+set /p "URL_SELECTION=  %E%[32m>%E%[37m Selection (Default: 1,2,3): %E%[0m"
+if "!URL_SELECTION!"=="" set "URL_SELECTION=1,2,3"
+
+set "CUSTOM_URLS="
+set "_tempUrl_=!URL_SELECTION:,= !"
+
+for %%a in (!_tempUrl_!) do (
+    set "token=%%a"
+    echo "!token!" | find "-" >nul
+    if !errorlevel! equ 0 (
+        for /f "tokens=1,2 delims=-" %%s in ("%%a") do (
+            set "ustart=%%s"
+            set "uend=%%t"
+        )
+        if "!ustart!"=="" set "ustart=!uend!"
+        if "!uend!"=="" set "uend=!ustart!"
+        for /l %%i in (!ustart!,1,!uend!) do (
+            call :AddUrl %%i
+        )
+    ) else (
+        call :AddUrl %%a
+    )
+)
+
+if "!CUSTOM_URLS!" neq "" set "CUSTOM_URLS=!CUSTOM_URLS:~0,-1!"
+goto ask_resends
+
+:AddUrl
+set "unum=%~1"
+if "!unum!"=="1" set "CUSTOM_URLS=!CUSTOM_URLS!https://www.facebook.com,"
+if "!unum!"=="2" set "CUSTOM_URLS=!CUSTOM_URLS!https://m.facebook.com,"
+if "!unum!"=="3" set "CUSTOM_URLS=!CUSTOM_URLS!https://mbasic.facebook.com,"
+if "!unum!"=="4" set "CUSTOM_URLS=!CUSTOM_URLS!https://touch.facebook.com,"
+if "!unum!"=="5" set "CUSTOM_URLS=!CUSTOM_URLS!https://free.facebook.com,"
+if "!unum!"=="6" set "CUSTOM_URLS=!CUSTOM_URLS!https://es-es.facebook.com,"
+if "!unum!"=="7" set "CUSTOM_URLS=!CUSTOM_URLS!https://fr-fr.facebook.com,"
+if "!unum!"=="8" set "CUSTOM_URLS=!CUSTOM_URLS!https://de-de.facebook.com,"
+if "!unum!"=="9" set "CUSTOM_URLS=!CUSTOM_URLS!https://pt-br.facebook.com,"
+if "!unum!"=="10" set "CUSTOM_URLS=!CUSTOM_URLS!https://it-it.facebook.com,"
+if "!unum!"=="11" set "CUSTOM_URLS=!CUSTOM_URLS!https://ar-ar.facebook.com,"
+if "!unum!"=="12" set "CUSTOM_URLS=!CUSTOM_URLS!https://hi-in.facebook.com,"
+if "!unum!"=="13" set "CUSTOM_URLS=!CUSTOM_URLS!https://id-id.facebook.com,"
+if "!unum!"=="14" set "CUSTOM_URLS=!CUSTOM_URLS!https://ru-ru.facebook.com,"
+goto :eof
+
+:: ── STEP 6: OTP Resend Configuration ──────────────────────────
 :ask_resends
 cls
 echo.
 echo   %E%[36m==================================================%E%[0m
-echo   %E%[32m  SCRAPER KING%E%[37m -- Step 5: OTP Resends%E%[0m
+echo   %E%[32m  SCRAPER KING%E%[37m -- Step 6: OTP Resends%E%[0m
 echo   %E%[36m==================================================%E%[0m
 echo.
 echo   %E%[37m  How many additional times should the bot click re-send?%E%[0m
@@ -374,6 +484,9 @@ echo   %E%[32m[+]%E%[37m Proxy     : %E%[33m!PROXY_STATUS!%E%[0m
 if "!PROXY_CHOICE!"=="auto" (
 echo   %E%[32m[+]%E%[37m Country   : %E%[33m!PROXY_COUNTRY!%E%[0m
 )
+if defined PROXY_TIMING (
+echo   %E%[32m[+]%E%[37m Connect   : %E%[33m!PROXY_TIMING!%E%[0m
+)
 if "!WORKERS!"=="" (
 echo   %E%[32m[+]%E%[37m Workers   : %E%[33mAuto-Detect ^(Max hardware limit^)%E%[0m
 ) else (
@@ -383,6 +496,11 @@ if defined LANG_CODE (
 echo   %E%[32m[+]%E%[37m Language  : %E%[33m!LANG_CODE!%E%[0m
 ) else (
 echo   %E%[32m[+]%E%[37m Languages : %E%[33m!LANG_CODES!%E%[0m
+)
+if defined CUSTOM_URLS (
+echo   %E%[32m[+]%E%[37m URLs      : %E%[33m!CUSTOM_URLS!%E%[0m
+) else (
+echo   %E%[32m[+]%E%[37m URLs      : %E%[33mAuto ^(All for language^)%E%[0m
 )
 echo.
 echo   %E%[36m==================================================%E%[0m
@@ -402,7 +520,7 @@ if defined LANG_CODE (
     set "RUN_LANG=!LANG_CODES!"
 )
 
-"!NODE_EXE!" "%~dp0autofill.js" "!NUMBERS_FILE!" "!PROXY_FILE!" "!WORKERS!" "!RUN_LANG!" "!PROXY_CHOICE!" "!PROXY_COUNTRY!" "!RESENDS!" "!LICENSE_KEY!"
+"!NODE_EXE!" "%~dp0autofill.js" "!NUMBERS_FILE!" "!PROXY_FILE!" "!WORKERS!" "!RUN_LANG!" "!PROXY_CHOICE!" "!PROXY_COUNTRY!" "!RESENDS!" "!CUSTOM_URLS!" "!PROXY_TIMING!" "!PROXY_USE_LIMIT!"
 
 :: ── DONE ──────────────────────────────────────────────────────
 echo.
