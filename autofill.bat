@@ -62,7 +62,7 @@ if not exist "%~dp0node_modules\playwright-extra" (
     echo.
     echo  %E%[33m[*] Installing required Node packages...%E%[0m
     echo.
-    call "!NPM_CMD!" install playwright playwright-extra puppeteer-extra-plugin-stealth axios socks-proxy-agent
+    call "!NPM_CMD!" install playwright playwright-extra puppeteer-extra-plugin-stealth
     if !errorlevel! neq 0 (
         echo  %E%[31m[~] Install failed. Check your internet connection.%E%[0m
         pause
