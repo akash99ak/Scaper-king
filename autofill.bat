@@ -8,9 +8,8 @@ for /f %%a in ('echo prompt $E ^| cmd') do set "E=%%a"
 
 cd /d "%~dp0"
 
-:: ── Capture Hardware ID from Launcher ─────────────────────────
+:: ── Developer Mode (No License) ─────────────────────────
 set "HARDWARE_ID=%~1"
-if "!HARDWARE_ID!"=="" set "HARDWARE_ID=NO_KEY"
 
 :: ── ASCII Art Header ─────────────────────────────────────────
 :show_header
@@ -77,7 +76,7 @@ if not exist "%~dp0node_modules\playwright-extra" (
 cls
 echo.
 echo   %E%[36m==================================================%E%[0m
-echo   %E%[32m  SCRAPER KING%E%[37m -- Step 1: Target List%E%[0m
+echo   %E%[92m  SCRAPER KING%E%[37m -- Step 1: Target List%E%[0m
 echo   %E%[36m==================================================%E%[0m
 echo.
 set "NUMBERS_FILE="
@@ -114,7 +113,7 @@ if !errorlevel! equ 0 (
 cls
 echo.
 echo   %E%[36m==================================================%E%[0m
-echo   %E%[32m  SCRAPER KING%E%[37m -- Step 2: Proxy Method%E%[0m
+echo   %E%[92m  SCRAPER KING%E%[37m -- Step 2: Proxy Method%E%[0m
 echo   %E%[36m==================================================%E%[0m
 echo.
     echo   %E%[32m[1]%E%[37m Auto Scraping (Proxies)%E%[0m
@@ -149,7 +148,7 @@ echo.
 cls
 echo.
 echo   %E%[36m==================================================%E%[0m
-echo   %E%[32m  SCRAPER KING%E%[37m -- Step 2.5: Proxy Country%E%[0m
+echo   %E%[92m  SCRAPER KING%E%[37m -- Step 2.5: Proxy Country%E%[0m
 echo   %E%[36m==================================================%E%[0m
 echo.
 echo   %E%[32m[1]%E%[37m Auto-Detect from Numbers File (Smartest)%E%[0m
@@ -199,20 +198,25 @@ goto ask_proxy_timing
 echo.
 set "PROXY_FILE="
 set "PROXY_COUNTRY=all"
-set /p "PROXY_FILE=  %E%[32m>%E%[37m Proxy file path: %E%[0m"
+set /p "PROXY_FILE=  %E%[32m>%E%[37m Proxy string or file path: %E%[0m"
 set "PROXY_FILE=!PROXY_FILE:"=!"
 
 if "!PROXY_FILE!"=="" (
     set "PROXY_CHOICE=direct"
-    set "PROXY_STATUS=Direct (No file provided)"
+    set "PROXY_STATUS=Direct (No proxy provided)"
     set "PROXY_USE_LIMIT=1"
     goto ask_workers
 )
-if not exist "!PROXY_FILE!" (
-    set "PROXY_CHOICE=direct"
-    set "PROXY_STATUS=Direct (File not found)"
-    set "PROXY_USE_LIMIT=1"
-    goto ask_workers
+
+:: If the input contains a colon, it's likely a raw proxy string, so bypass file check
+echo !PROXY_FILE! | findstr /C:":" >nul
+if !errorlevel! neq 0 (
+    if not exist "!PROXY_FILE!" (
+        set "PROXY_CHOICE=direct"
+        set "PROXY_STATUS=Direct (File not found)"
+        set "PROXY_USE_LIMIT=1"
+        goto ask_workers
+    )
 )
 
 set "PROXY_CHOICE=custom"
@@ -224,7 +228,49 @@ set "PROXY_USE_LIMIT="
 set /p "PROXY_USE_LIMIT=  %E%[32m>%E%[37m Usages per proxy (Default 1): %E%[0m"
 if "!PROXY_USE_LIMIT!"=="" set "PROXY_USE_LIMIT=1"
 
-goto ask_proxy_timing
+cls
+echo.
+echo   %E%[36m==================================================%E%[0m
+echo   %E%[92m  SCRAPER KING%E%[37m -- Custom Proxy Type%E%[0m
+echo   %E%[36m==================================================%E%[0m
+echo.
+echo   %E%[32m[1]%E%[37m Datacenter / Static IPv4 (No location targeting)%E%[0m
+echo   %E%[32m[2]%E%[37m Residential (Dynamic location targeting)%E%[0m
+echo.
+set "PROXY_TYPE_CHOICE="
+set /p "PROXY_TYPE_CHOICE=  %E%[32m>%E%[37m Choice [1-2] (Default 1): %E%[0m"
+if "!PROXY_TYPE_CHOICE!"=="" set "PROXY_TYPE_CHOICE=1"
+
+if "!PROXY_TYPE_CHOICE!"=="1" (
+    set "PROXY_TYPE=datacenter"
+    set "PROXY_COUNTRY=none"
+    goto ask_proxy_timing
+)
+
+set "PROXY_TYPE=residential"
+cls
+echo.
+echo   %E%[36m==================================================%E%[0m
+echo   %E%[92m  SCRAPER KING%E%[37m -- Custom Proxy Provider%E%[0m
+echo   %E%[36m==================================================%E%[0m
+echo.
+echo   %E%[32m[1]%E%[37m Auto-Detect from String (Recommended)%E%[0m
+echo   %E%[32m[2]%E%[37m BrightData%E%[0m
+echo   %E%[32m[3]%E%[37m IPRoyal / SmartProxy%E%[0m
+echo   %E%[32m[4]%E%[37m Webshare%E%[0m
+echo   %E%[32m[5]%E%[37m ProxyRack%E%[0m
+echo.
+set "PROXY_PROVIDER_CHOICE="
+set /p "PROXY_PROVIDER_CHOICE=  %E%[32m>%E%[37m Choice [1-5] (Default 1): %E%[0m"
+if "!PROXY_PROVIDER_CHOICE!"=="" set "PROXY_PROVIDER_CHOICE=1"
+
+set "PROXY_PROVIDER=auto"
+if "!PROXY_PROVIDER_CHOICE!"=="2" set "PROXY_PROVIDER=brightdata"
+if "!PROXY_PROVIDER_CHOICE!"=="3" set "PROXY_PROVIDER=iproyal"
+if "!PROXY_PROVIDER_CHOICE!"=="4" set "PROXY_PROVIDER=webshare"
+if "!PROXY_PROVIDER_CHOICE!"=="5" set "PROXY_PROVIDER=proxyrack"
+
+goto ask_proxy_country
 
 :direct_proxy
 set "PROXY_CHOICE=direct"
@@ -238,7 +284,7 @@ goto ask_workers
 cls
 echo.
 echo   %E%[36m==================================================%E%[0m
-echo   %E%[32m  SCRAPER KING%E%[37m -- Step 2.8: When to connect proxy?%E%[0m
+echo   %E%[92m  SCRAPER KING%E%[37m -- Step 2.8: When to connect proxy?%E%[0m
 echo   %E%[36m==================================================%E%[0m
 echo.
 echo   %E%[32m[1]%E%[37m From the start (Browser is completely proxy covered)%E%[0m
@@ -258,7 +304,7 @@ goto ask_workers
 cls
 echo.
 echo   %E%[36m==================================================%E%[0m
-echo   %E%[32m  SCRAPER KING%E%[37m -- Step 3: Workers%E%[0m
+echo   %E%[92m  SCRAPER KING%E%[37m -- Step 3: Workers%E%[0m
 echo   %E%[36m==================================================%E%[0m
 echo.
 echo   %E%[37m  Leave blank to auto-detect optimal limit based on PC hardware.%E%[0m
@@ -271,7 +317,7 @@ set /p "WORKERS=  %E%[32m>%E%[37m Number of workers (Enter to auto-detect): %E%[
 cls
 echo.
 echo   %E%[36m==================================================%E%[0m
-echo   %E%[32m  SCRAPER KING%E%[37m -- Step 4: Languages%E%[0m
+echo   %E%[92m  SCRAPER KING%E%[37m -- Step 4: Languages%E%[0m
 echo   %E%[36m==================================================%E%[0m
 echo.
 echo   %E%[32m[1]%E%[37m Single Language Profile%E%[0m
@@ -287,7 +333,7 @@ if "!LANG_MODE!"=="2" goto multi_language
 cls
 echo.
 echo   %E%[36m==================================================%E%[0m
-echo   %E%[32m  SCRAPER KING%E%[37m -- Select Language%E%[0m
+echo   %E%[92m  SCRAPER KING%E%[37m -- Select Language%E%[0m
 echo   %E%[36m==================================================%E%[0m
 echo.
 echo   %E%[37m  1: EN   2: ES   3: FR   4: DE   5: PT   6: IT%E%[0m
@@ -314,7 +360,7 @@ goto language_done
 cls
 echo.
 echo   %E%[36m==================================================%E%[0m
-echo   %E%[32m  SCRAPER KING%E%[37m -- Multi-Language Selection%E%[0m
+echo   %E%[92m  SCRAPER KING%E%[37m -- Multi-Language Selection%E%[0m
 echo   %E%[36m==================================================%E%[0m
 echo.
 echo   %E%[37m  Languages: 1:EN 2:ES 3:FR 4:DE 5:PT 6:IT 7:AR 8:HI 9:BN 10:ID 11:RU%E%[0m
@@ -372,7 +418,7 @@ goto :eof
 cls
 echo.
 echo   %E%[36m==================================================%E%[0m
-echo   %E%[32m  SCRAPER KING%E%[37m -- Step 5: Target URLs%E%[0m
+echo   %E%[92m  SCRAPER KING%E%[37m -- Step 5: Target URLs%E%[0m
 echo   %E%[36m==================================================%E%[0m
 echo.
 echo   %E%[32m[1]%E%[37m Auto (All available URLs for selected language)%E%[0m
@@ -391,7 +437,7 @@ if "!URL_MODE!"=="1" (
 cls
 echo.
 echo   %E%[36m==================================================%E%[0m
-echo   %E%[32m  SCRAPER KING%E%[37m -- Select Target URLs%E%[0m
+echo   %E%[92m  SCRAPER KING%E%[37m -- Select Target URLs%E%[0m
 echo   %E%[36m==================================================%E%[0m
 echo.
 echo   %E%[37m   1: www.facebook.com          (Desktop)%E%[0m
@@ -462,7 +508,7 @@ goto :eof
 cls
 echo.
 echo   %E%[36m==================================================%E%[0m
-echo   %E%[32m  SCRAPER KING%E%[37m -- Step 6: OTP Resends%E%[0m
+echo   %E%[92m  SCRAPER KING%E%[37m -- Step 6: OTP Resends%E%[0m
 echo   %E%[36m==================================================%E%[0m
 echo.
 echo   %E%[37m  How many additional times should the bot click re-send?%E%[0m
@@ -472,14 +518,42 @@ set "RESENDS="
 set /p "RESENDS=  %E%[32m>%E%[37m Number of resends [0-5] (Default 0): %E%[0m"
 if "!RESENDS!"=="" set "RESENDS=0"
 
+:: ── STEP 6.5: Bandwidth Saver ─────────────────────────────────
+:ask_bandwidth
+cls
+echo.
+echo   %E%[36m==================================================%E%[0m
+echo   %E%[92m  SCRAPER KING%E%[37m -- Step 6.5: Bandwidth Saver%E%[0m
+echo   %E%[36m==================================================%E%[0m
+echo.
+echo   %E%[37m  Reduce proxy data usage by blocking images, fonts ^& media.%E%[0m
+echo   %E%[37m  CSS and JavaScript are NOT blocked (required for detection).%E%[0m
+echo   %E%[37m  Recommended if using a GB-based premium proxy.%E%[0m
+echo.
+echo   %E%[32m[1]%E%[37m Off  ^(Normal mode, load everything^)%E%[0m
+echo   %E%[32m[2]%E%[37m On   ^(Block images, fonts ^& media ~30-50%% less data^)%E%[0m
+echo.
+set "BW_CHOICE="
+set /p "BW_CHOICE=  %E%[32m>%E%[37m Choice [1-2] (Default 1): %E%[0m"
+if "!BW_CHOICE!"=="" set "BW_CHOICE=1"
+
+set "BANDWIDTH_SAVER=0"
+if "!BW_CHOICE!"=="2" set "BANDWIDTH_SAVER=1"
+
+
 :: ── CONFIRM ───────────────────────────────────────────────────
 cls
 echo.
 echo   %E%[36m==================================================%E%[0m
-echo   %E%[32m  SCRAPER KING%E%[37m -- READY FOR LAUNCH%E%[0m
+echo   %E%[92m  SCRAPER KING%E%[37m -- READY FOR LAUNCH%E%[0m
 echo   %E%[36m==================================================%E%[0m
 echo.
 echo   %E%[32m[+]%E%[37m Targets   : %E%[33m!NUMBERS_FILE!%E%[0m
+if "!BANDWIDTH_SAVER!"=="1" (
+echo   %E%[32m[+]%E%[37m Bandwidth : %E%[33mSaver ON ^(images/fonts/media blocked^)%E%[0m
+) else (
+echo   %E%[32m[+]%E%[37m Bandwidth : %E%[33mNormal%E%[0m
+)
 echo   %E%[32m[+]%E%[37m Proxy     : %E%[33m!PROXY_STATUS!%E%[0m
 if "!PROXY_CHOICE!"=="auto" (
 echo   %E%[32m[+]%E%[37m Country   : %E%[33m!PROXY_COUNTRY!%E%[0m
@@ -520,12 +594,13 @@ if defined LANG_CODE (
     set "RUN_LANG=!LANG_CODES!"
 )
 
+set "BANDWIDTH_SAVER=!BANDWIDTH_SAVER!"
 "!NODE_EXE!" "%~dp0autofill.js" "!NUMBERS_FILE!" "!PROXY_FILE!" "!WORKERS!" "!RUN_LANG!" "!PROXY_CHOICE!" "!PROXY_COUNTRY!" "!RESENDS!" "!CUSTOM_URLS!" "!PROXY_TIMING!" "!PROXY_USE_LIMIT!" "!HARDWARE_ID!"
 
 :: ── DONE ──────────────────────────────────────────────────────
 echo.
 echo   %E%[36m==================================================%E%[0m
-echo   %E%[32m  FINISHED%E%[0m
+echo   %E%[92m  SCRAPER KING%E%[37m -- FINISHED%E%[0m
 echo   %E%[36m==================================================%E%[0m
 echo.
 for %%F in ("!NUMBERS_FILE!") do set "OUT_DIR=%%~dpF"
