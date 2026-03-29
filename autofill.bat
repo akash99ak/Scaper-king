@@ -135,12 +135,13 @@ echo.
     set "PROXY_CHOICE=auto"
     set "PROXY_FILE="
     set "PROXY_STATUS=Auto (Public Proxies)"
-    goto ask_proxy_country
+    goto ask_proxy_protocol
 
 :vpn_proxy
     set "PROXY_CHOICE=vpn"
     set "PROXY_FILE="
     set "PROXY_COUNTRY=none"
+    set "PROXY_PROTOCOL=http"
     set "PROXY_STATUS=VPN / Mobile Data (No Timeout)"
     goto ask_workers
 
@@ -196,6 +197,12 @@ goto ask_proxy_timing
 
 :custom_proxy
 echo.
+echo   %E%[33m[*]\x1b[37m Supported Formats for Single Proxy Strings:%E%[0m
+echo       - %E%[36mip:port%E%[0m
+echo       - %E%[36mip:port:user:pass%E%[0m
+echo       - %E%[36muser:pass@ip:port%E%[0m
+echo       - %E%[36mip:port@user:pass%E%[0m
+echo.
 set "PROXY_FILE="
 set "PROXY_COUNTRY=all"
 set /p "PROXY_FILE=  %E%[32m>%E%[37m Proxy string or file path: %E%[0m"
@@ -227,6 +234,24 @@ echo   %E%[37m  How many times should each proxy be used before moving to the ne
 set "PROXY_USE_LIMIT="
 set /p "PROXY_USE_LIMIT=  %E%[32m>%E%[37m Usages per proxy (Default 1): %E%[0m"
 if "!PROXY_USE_LIMIT!"=="" set "PROXY_USE_LIMIT=1"
+
+cls
+echo.
+echo   %E%[36m==================================================%E%[0m
+echo   %E%[92m  SCRAPER KING%E%[37m -- Custom Proxy Protocol%E%[0m
+echo   %E%[36m==================================================%E%[0m
+echo.
+echo   %E%[32m[1]%E%[37m HTTP / HTTPS  (Most premium proxies)%E%[0m
+echo   %E%[32m[2]%E%[37m SOCKS4%E%[0m
+echo   %E%[32m[3]%E%[37m SOCKS5        (OwlProxy, PIA, etc.)%E%[0m
+echo.
+set "CUSTOM_PROTO_CHOICE="
+set /p "CUSTOM_PROTO_CHOICE=  %E%[32m>%E%[37m Protocol [1-3] (Default 1): %E%[0m"
+if "!CUSTOM_PROTO_CHOICE!"=="" set "CUSTOM_PROTO_CHOICE=1"
+
+set "PROXY_PROTOCOL=http"
+if "!CUSTOM_PROTO_CHOICE!"=="2" set "PROXY_PROTOCOL=socks4"
+if "!CUSTOM_PROTO_CHOICE!"=="3" set "PROXY_PROTOCOL=socks5"
 
 cls
 echo.
@@ -276,8 +301,34 @@ goto ask_proxy_country
 set "PROXY_CHOICE=direct"
 set "PROXY_FILE="
 set "PROXY_COUNTRY=all"
+set "PROXY_PROTOCOL=http"
 set "PROXY_STATUS=Direct Connection"
 goto ask_workers
+
+:: ── STEP 2.3: Proxy Protocol (Auto mode) ──────────────────────────
+:ask_proxy_protocol
+cls
+echo.
+echo   %E%[36m==================================================%E%[0m
+echo   %E%[92m  SCRAPER KING%E%[37m -- Step 2.3: Proxy Protocol%E%[0m
+echo   %E%[36m==================================================%E%[0m
+echo.
+echo   %E%[37m  Select the protocol to scrape from public proxy lists:%E%[0m
+echo.
+echo   %E%[32m[1]%E%[37m HTTP / HTTPS        (Classic, best compatibility)%E%[0m
+echo   %E%[32m[2]%E%[37m SOCKS4              (Faster tunneling)%E%[0m
+echo   %E%[32m[3]%E%[37m SOCKS5              (Most available free proxies)%E%[0m
+echo.
+set "PROTO_CHOICE="
+set /p "PROTO_CHOICE=  %E%[32m>%E%[37m Protocol [1-3] (Default 3): %E%[0m"
+if "!PROTO_CHOICE!"=="" set "PROTO_CHOICE=3"
+
+set "PROXY_PROTOCOL=socks5"
+if "!PROTO_CHOICE!"=="1" set "PROXY_PROTOCOL=http"
+if "!PROTO_CHOICE!"=="2" set "PROXY_PROTOCOL=socks4"
+if "!PROTO_CHOICE!"=="3" set "PROXY_PROTOCOL=socks5"
+
+goto ask_proxy_country
 
 :: ── STEP 2.8: Proxy Timing ────────────────────────────────────────
 :ask_proxy_timing
@@ -555,6 +606,7 @@ echo   %E%[32m[+]%E%[37m Bandwidth : %E%[33mSaver ON ^(images/fonts/media blocke
 echo   %E%[32m[+]%E%[37m Bandwidth : %E%[33mNormal%E%[0m
 )
 echo   %E%[32m[+]%E%[37m Proxy     : %E%[33m!PROXY_STATUS!%E%[0m
+echo   %E%[32m[+]%E%[37m Protocol  : %E%[33m!PROXY_PROTOCOL!%E%[0m
 if "!PROXY_CHOICE!"=="auto" (
 echo   %E%[32m[+]%E%[37m Country   : %E%[33m!PROXY_COUNTRY!%E%[0m
 )
@@ -595,7 +647,7 @@ if defined LANG_CODE (
 )
 
 set "BANDWIDTH_SAVER=!BANDWIDTH_SAVER!"
-"!NODE_EXE!" "%~dp0autofill.js" "!NUMBERS_FILE!" "!PROXY_FILE!" "!WORKERS!" "!RUN_LANG!" "!PROXY_CHOICE!" "!PROXY_COUNTRY!" "!RESENDS!" "!CUSTOM_URLS!" "!PROXY_TIMING!" "!PROXY_USE_LIMIT!" "!HARDWARE_ID!"
+"!NODE_EXE!" "%~dp0autofill.js" "!NUMBERS_FILE!" "!PROXY_FILE!" "!WORKERS!" "!RUN_LANG!" "!PROXY_CHOICE!" "!PROXY_COUNTRY!" "!RESENDS!" "!CUSTOM_URLS!" "!PROXY_TIMING!" "!PROXY_USE_LIMIT!" "!HARDWARE_ID!" "!PROXY_PROTOCOL!"
 
 :: ── DONE ──────────────────────────────────────────────────────
 echo.
