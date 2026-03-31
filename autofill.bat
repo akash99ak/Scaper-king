@@ -74,10 +74,9 @@ if not exist "%~dp0node_modules\playwright-extra" (
 :: ── STEP 1: Numbers file ──────────────────────────────────────
 :ask_numbers
 cls
-echo.
-echo   %E%[36m==================================================%E%[0m
-echo   %E%[92m  SCRAPER KING%E%[37m -- Step 1: Target List%E%[0m
-echo   %E%[36m==================================================%E%[0m
+call :print_header
+echo   %E%[33m  Step 1: Target List%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
 echo.
 set "NUMBERS_FILE="
 set /p "NUMBERS_FILE=  %E%[32m>%E%[37m Numbers file path (or drag/drop): %E%[0m"
@@ -111,10 +110,9 @@ if !errorlevel! equ 0 (
 :: ── STEP 2: Proxy Configuration ────────────────────────────────
 :ask_proxy
 cls
-echo.
-echo   %E%[36m==================================================%E%[0m
-echo   %E%[92m  SCRAPER KING%E%[37m -- Step 2: Proxy Method%E%[0m
-echo   %E%[36m==================================================%E%[0m
+call :print_header
+echo   %E%[33m  Step 2: Proxy Method%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
 echo.
     echo   %E%[32m[1]%E%[37m Auto Scraping (Proxies)%E%[0m
     echo   %E%[32m[2]%E%[37m VPN / Mobile Data (No Timeout)%E%[0m
@@ -147,10 +145,9 @@ echo.
 
 :ask_proxy_country
 cls
-echo.
-echo   %E%[36m==================================================%E%[0m
-echo   %E%[92m  SCRAPER KING%E%[37m -- Step 2.5: Proxy Country%E%[0m
-echo   %E%[36m==================================================%E%[0m
+call :print_header
+echo   %E%[33m  Step 2.5: Proxy Country%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
 echo.
 echo   %E%[32m[1]%E%[37m Auto-Detect from Numbers File (Smartest)%E%[0m
 echo   %E%[32m[2]%E%[37m All Countries (Fastest, max speed)%E%[0m
@@ -236,10 +233,9 @@ set /p "PROXY_USE_LIMIT=  %E%[32m>%E%[37m Usages per proxy (Default 1): %E%[0m"
 if "!PROXY_USE_LIMIT!"=="" set "PROXY_USE_LIMIT=1"
 
 cls
-echo.
-echo   %E%[36m==================================================%E%[0m
-echo   %E%[92m  SCRAPER KING%E%[37m -- Custom Proxy Protocol%E%[0m
-echo   %E%[36m==================================================%E%[0m
+call :print_header
+echo   %E%[33m  Custom Proxy Protocol%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
 echo.
 echo   %E%[32m[1]%E%[37m HTTP / HTTPS  (Most premium proxies)%E%[0m
 echo   %E%[32m[2]%E%[37m SOCKS4%E%[0m
@@ -254,10 +250,9 @@ if "!CUSTOM_PROTO_CHOICE!"=="2" set "PROXY_PROTOCOL=socks4"
 if "!CUSTOM_PROTO_CHOICE!"=="3" set "PROXY_PROTOCOL=socks5"
 
 cls
-echo.
-echo   %E%[36m==================================================%E%[0m
-echo   %E%[92m  SCRAPER KING%E%[37m -- Custom Proxy Type%E%[0m
-echo   %E%[36m==================================================%E%[0m
+call :print_header
+echo   %E%[33m  Custom Proxy Type%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
 echo.
 echo   %E%[32m[1]%E%[37m Datacenter / Static IPv4 (No location targeting)%E%[0m
 echo   %E%[32m[2]%E%[37m Residential (Dynamic location targeting)%E%[0m
@@ -274,10 +269,9 @@ if "!PROXY_TYPE_CHOICE!"=="1" (
 
 set "PROXY_TYPE=residential"
 cls
-echo.
-echo   %E%[36m==================================================%E%[0m
-echo   %E%[92m  SCRAPER KING%E%[37m -- Custom Proxy Provider%E%[0m
-echo   %E%[36m==================================================%E%[0m
+call :print_header
+echo   %E%[33m  Custom Proxy Provider%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
 echo.
 echo   %E%[32m[1]%E%[37m Auto-Detect from String (Recommended)%E%[0m
 echo   %E%[32m[2]%E%[37m BrightData%E%[0m
@@ -308,10 +302,9 @@ goto ask_workers
 :: ── STEP 2.3: Proxy Protocol (Auto mode) ──────────────────────────
 :ask_proxy_protocol
 cls
-echo.
-echo   %E%[36m==================================================%E%[0m
-echo   %E%[92m  SCRAPER KING%E%[37m -- Step 2.3: Proxy Protocol%E%[0m
-echo   %E%[36m==================================================%E%[0m
+call :print_header
+echo   %E%[33m  Step 2.3: Proxy Protocol%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
 echo.
 echo   %E%[37m  Select the protocol to scrape from public proxy lists:%E%[0m
 echo.
@@ -333,10 +326,9 @@ goto ask_proxy_country
 :: ── STEP 2.8: Proxy Timing ────────────────────────────────────────
 :ask_proxy_timing
 cls
-echo.
-echo   %E%[36m==================================================%E%[0m
-echo   %E%[92m  SCRAPER KING%E%[37m -- Step 2.8: When to connect proxy?%E%[0m
-echo   %E%[36m==================================================%E%[0m
+call :print_header
+echo   %E%[33m  Step 2.8: When to connect proxy?%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
 echo.
 echo   %E%[32m[1]%E%[37m From the start (Browser is completely proxy covered)%E%[0m
 echo   %E%[32m[2]%E%[37m When the SMS option is found (Fast, uses local IP first)%E%[0m
@@ -353,10 +345,9 @@ goto ask_workers
 :: ── STEP 3: Worker Configuration ────────────────────────────────
 :ask_workers
 cls
-echo.
-echo   %E%[36m==================================================%E%[0m
-echo   %E%[92m  SCRAPER KING%E%[37m -- Step 3: Workers%E%[0m
-echo   %E%[36m==================================================%E%[0m
+call :print_header
+echo   %E%[33m  Step 3: Workers%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
 echo.
 echo   %E%[37m  Leave blank to auto-detect optimal limit based on PC hardware.%E%[0m
 echo.
@@ -366,10 +357,9 @@ set /p "WORKERS=  %E%[32m>%E%[37m Number of workers (Enter to auto-detect): %E%[
 :: ── STEP 4: Language Configuration ───────────────────────────
 :ask_language
 cls
-echo.
-echo   %E%[36m==================================================%E%[0m
-echo   %E%[92m  SCRAPER KING%E%[37m -- Step 4: Languages%E%[0m
-echo   %E%[36m==================================================%E%[0m
+call :print_header
+echo   %E%[33m  Step 4: Languages%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
 echo.
 echo   %E%[32m[1]%E%[37m Single Language Profile%E%[0m
 echo   %E%[32m[2]%E%[37m Multi-Language Rotation%E%[0m
@@ -382,10 +372,9 @@ if "!LANG_MODE!"=="2" goto multi_language
 
 :single_language
 cls
-echo.
-echo   %E%[36m==================================================%E%[0m
-echo   %E%[92m  SCRAPER KING%E%[37m -- Select Language%E%[0m
-echo   %E%[36m==================================================%E%[0m
+call :print_header
+echo   %E%[33m  Select Language%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
 echo.
 echo   %E%[37m  1: EN   2: ES   3: FR   4: DE   5: PT   6: IT%E%[0m
 echo   %E%[37m  7: AR   8: HI   9: BN  10: ID  11: RU%E%[0m
@@ -409,10 +398,9 @@ goto language_done
 
 :multi_language
 cls
-echo.
-echo   %E%[36m==================================================%E%[0m
-echo   %E%[92m  SCRAPER KING%E%[37m -- Multi-Language Selection%E%[0m
-echo   %E%[36m==================================================%E%[0m
+call :print_header
+echo   %E%[33m  Multi-Language Selection%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
 echo.
 echo   %E%[37m  Languages: 1:EN 2:ES 3:FR 4:DE 5:PT 6:IT 7:AR 8:HI 9:BN 10:ID 11:RU%E%[0m
 echo   %E%[37m  Example inputs: "1-3" or "1,2,5" or "1-11"%E%[0m
@@ -467,10 +455,9 @@ goto :eof
 :: ── STEP 5: URL Selection ─────────────────────────────────────
 :ask_urls
 cls
-echo.
-echo   %E%[36m==================================================%E%[0m
-echo   %E%[92m  SCRAPER KING%E%[37m -- Step 5: Target URLs%E%[0m
-echo   %E%[36m==================================================%E%[0m
+call :print_header
+echo   %E%[33m  Step 5: Target URLs%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
 echo.
 echo   %E%[32m[1]%E%[37m Auto (All available URLs for selected language)%E%[0m
 echo   %E%[32m[2]%E%[37m Select specific URLs%E%[0m
@@ -486,10 +473,9 @@ if "!URL_MODE!"=="1" (
 
 :select_urls
 cls
-echo.
-echo   %E%[36m==================================================%E%[0m
-echo   %E%[92m  SCRAPER KING%E%[37m -- Select Target URLs%E%[0m
-echo   %E%[36m==================================================%E%[0m
+call :print_header
+echo   %E%[33m  Select Target URLs%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
 echo.
 echo   %E%[37m   1: www.facebook.com          (Desktop)%E%[0m
 echo   %E%[37m   2: m.facebook.com            (Mobile)%E%[0m
@@ -557,10 +543,9 @@ goto :eof
 :: ── STEP 6: OTP Resend Configuration ──────────────────────────
 :ask_resends
 cls
-echo.
-echo   %E%[36m==================================================%E%[0m
-echo   %E%[92m  SCRAPER KING%E%[37m -- Step 6: OTP Resends%E%[0m
-echo   %E%[36m==================================================%E%[0m
+call :print_header
+echo   %E%[33m  Step 6: OTP Resends%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
 echo.
 echo   %E%[37m  How many additional times should the bot click re-send?%E%[0m
 echo   %E%[37m  (0 = 1 total SMS, 1 = 2 total SMS, 2 = 3 total SMS)%E%[0m
@@ -572,10 +557,9 @@ if "!RESENDS!"=="" set "RESENDS=0"
 :: ── STEP 6.5: Bandwidth Saver ─────────────────────────────────
 :ask_bandwidth
 cls
-echo.
-echo   %E%[36m==================================================%E%[0m
-echo   %E%[92m  SCRAPER KING%E%[37m -- Step 6.5: Bandwidth Saver%E%[0m
-echo   %E%[36m==================================================%E%[0m
+call :print_header
+echo   %E%[33m  Step 6.5: Bandwidth Saver%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
 echo.
 echo   %E%[37m  Reduce proxy data usage by blocking images, fonts ^& media.%E%[0m
 echo   %E%[37m  CSS and JavaScript are NOT blocked (required for detection).%E%[0m
@@ -594,10 +578,9 @@ if "!BW_CHOICE!"=="2" set "BANDWIDTH_SAVER=1"
 
 :: ── CONFIRM ───────────────────────────────────────────────────
 cls
-echo.
-echo   %E%[36m==================================================%E%[0m
-echo   %E%[92m  SCRAPER KING%E%[37m -- READY FOR LAUNCH%E%[0m
-echo   %E%[36m==================================================%E%[0m
+call :print_header
+echo   %E%[33m  READY FOR LAUNCH%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
 echo.
 echo   %E%[32m[+]%E%[37m Targets   : %E%[33m!NUMBERS_FILE!%E%[0m
 if "!BANDWIDTH_SAVER!"=="1" (
@@ -658,3 +641,21 @@ echo.
 for %%F in ("!NUMBERS_FILE!") do set "OUT_DIR=%%~dpF"
 explorer "!OUT_DIR!"
 pause
+goto :eof
+
+:: ═══════════════════════════════════════════════════════════════
+::  Reusable branded header subroutine
+:: ═══════════════════════════════════════════════════════════════
+:print_header
+echo   %E%[92m  ___  ___ ___    _   ___ ___ ___   _  _____ _  _  ___ %E%[0m
+echo   %E%[92m / __^|/ __^| _ \  /_\ ^| _ \ __^| _ \ ^| ^|/ /_ _^| \^| ^|/ __^|%E%[0m
+echo   %E%[92m \__ \ (__^|   / / _ \^|  _/ _^|^|   / ^| ' ^< ^| ^|^| .` ^| (__ %E%[0m
+echo   %E%[92m ^|___/\___^|_^|_\/_/ \_\_^| ^|___^|_^|_\ ^|_^|\_\___^|_^|\_^|\___^|%E%[0m
+echo.
+echo   %E%[36m==================================================%E%[0m
+echo   %E%[32m[+]%E%[37m FB Recovery OTP Autofill Engine%E%[0m
+echo   %E%[32m[+]%E%[37m Developer  : %E%[33mScraper-King%E%[0m
+echo   %E%[32m[+]%E%[37m Contact    : %E%[33mhttps://t.me/scraper_king%E%[0m
+echo   %E%[36m==================================================%E%[0m
+echo.
+goto :eof
