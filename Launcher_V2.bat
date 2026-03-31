@@ -268,6 +268,12 @@ if defined PROXY_FILE echo   %E%[32m[+]%E%[37m Proxy     : %E%[33m!PROXY_FILE!%E
 echo   %E%[32m[+]%E%[37m Detection : %E%[33mAuto (MEmu/LDPlayer TCP Scan)%E%[0m
 echo.
 echo   %E%[36m==================================================%E%[0m
+echo   %E%[33m  EMULATOR SETUP INSTRUCTIONS:%E%[0m
+echo   %E%[37m  1. Open your Android Emulator (MEmu, LDPlayer, etc.)%E%[0m
+echo   %E%[37m  2. Create as many emulator instances as you need (workers).%E%[0m
+echo   %E%[37m  3. Ensure FB Lite is installed on all of them.%E%[0m
+echo   %E%[37m  4. Close FB Lite and leave them on the home screen.%E%[0m
+echo   %E%[36m==================================================%E%[0m
 echo.
 set "CONFIRM="
 set /p "CONFIRM=  %E%[32m>%E%[37m Press ENTER to start or N to cancel: %E%[0m"
