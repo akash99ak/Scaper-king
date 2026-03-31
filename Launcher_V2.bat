@@ -33,9 +33,16 @@ if !errorlevel! neq 0 (
     if not exist "!NODE_EXE!" set "NODE_EXE=%LOCALAPPDATA%\Programs\nodejs\node.exe"
 )
 
-set "NPM_CMD=npm.cmd"
-where npm >nul 2>nul
-if !errorlevel! neq 0 (
+set "NPM_CMD="
+:: Find the absolute path to the real global npm.cmd
+for /f "delims=" %%P in ('where npm.cmd 2^>nul') do (
+    echo %%P | findstr /i "ScraperKing" >nul || (
+        set "NPM_CMD=%%P"
+        goto :found_npm
+    )
+)
+:found_npm
+if "!NPM_CMD!"=="" (
     set "NPM_CMD=C:\Program Files\nodejs\npm.cmd"
     if not exist "!NPM_CMD!" set "NPM_CMD=C:\Program Files (x86)\nodejs\npm.cmd"
     if not exist "!NPM_CMD!" set "NPM_CMD=%LOCALAPPDATA%\Programs\nodejs\npm.cmd"
