@@ -345,7 +345,19 @@ if not exist "!INSTALL_DIR!\.git" (
     echo   %E%[33m[*]%E%[37m Updating to latest version...%E%[0m
     cd /d "!INSTALL_DIR!"
     git pull
-    echo   %E%[32m[OK]%E%[37m Up to date!%E%[0m
+    if !errorlevel! neq 0 (
+        echo   %E%[31m[-] Update conflict detected. Healing repository...%E%[0m
+        cd /d "%TEMP%"
+        rd /s /q "!INSTALL_DIR!"
+        git clone "!REPO_URL!" "!INSTALL_DIR!"
+        if !errorlevel! neq 0 (
+            echo   %E%[31m[-] Auto-heal failed. Check your internet.%E%[0m
+            goto :fail
+        )
+        echo   %E%[32m[OK]%E%[37m Repository repaired & updated!%E%[0m
+    ) else (
+        echo   %E%[32m[OK]%E%[37m Up to date!%E%[0m
+    )
 )
 
 :: ── Packages are checked per-engine now ─────────────────────────
