@@ -1,0 +1,9 @@
+{
+  "version": "1.0.1",
+  "files": [
+    "autofill.js",
+    "worker.js",
+    "autofill.bat",
+    "proxyTester.js"
+  ]
+}

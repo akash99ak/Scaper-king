@@ -1,0 +1,19 @@
+Scraper-King Engine Auto-Installer
+========================================
+
+[OK] Portable Java 17 ready.
+[OK] SDK Tools ready.
+
+[5/5] Fetching headless Android 8.1 x86 Image (~1GB)...
+This may take a few minutes depending on your internet speed.
+> sdkmanager --licenses
+(node:23868) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+'D:\WORK\Pc_Clone\PC_clone' is not recognized as an internal or external command,
+operable program or batch file.
+
+Fatal Error: Error: sdkmanager exited with code 1
+    at ChildProcess.<anonymous> (D:\WORK\Pc_Clone\PC_clone V\Pc_Clone V17\AUto_fixed\v2_desktop_bot\setup_engine.js:105:25)
+    at ChildProcess.emit (node:events:508:28)
+    at maybeClose (node:internal/child_process:1100:16)
+    at ChildProcess._handle.onexit (node:internal/child_process:305:5)

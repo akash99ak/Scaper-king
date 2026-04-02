@@ -1,0 +1,21 @@
+{
+  "name": "v2_desktop_bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "cli-progress": "^3.12.0",
+    "fast-xml-parser": "^5.5.9",
+    "log-update": "^4.0.0",
+    "node-fetch": "^2.7.0",
+    "unzipper": "^0.12.3"
+  }
+}
