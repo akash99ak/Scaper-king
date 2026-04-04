@@ -237,28 +237,30 @@ if not exist "%USERPROFILE%\.android\avd\Scraper_King_Base.avd\config.ini" (
     timeout /t 2 >nul
 )
 
-:: Check if App Library is populated
-set "APK_COUNT=0"
-if exist "%~dp0apks\*.apk" (
-    for %%F in ("%~dp0apks\*.apk") do set /a APK_COUNT+=1
-)
-if !APK_COUNT! EQU 0 (
-    cls
-    call :print_header
-    echo   %E%[33m  Downloading App Library...%E%[0m
-    echo   %E%[36m--------------------------------------------------%E%[0m
-    echo.
-    echo   %E%[37m  Fetching available apps from the cloud...%E%[0m
-    echo.
-    "!NODE_EXE!" "%~dp0apk_manager.js"
-    if !errorlevel! neq 0 (
+:: Sync App Library (always check for new apps, apk_manager caches existing ones)
+cls
+call :print_header
+echo   %E%[33m  Syncing App Library...%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
+echo.
+echo   %E%[37m  Checking for new apps in the cloud...%E%[0m
+echo.
+"!NODE_EXE!" "%~dp0apk_manager.js"
+if !errorlevel! neq 0 (
+    :: If sync fails, check if we have local cache
+    set "APK_COUNT=0"
+    if exist "%~dp0apks\*.apk" (
+        for %%F in ("%~dp0apks\*.apk") do set /a APK_COUNT+=1
+    )
+    if !APK_COUNT! EQU 0 (
         echo.
-        echo  %E%[31m[~] App download failed. Check your internet.%E%[0m
+        echo  %E%[31m[~] App download failed and no local cache. Check your internet.%E%[0m
         pause
         exit /b 1
     )
-    timeout /t 2 >nul
+    echo  %E%[33m[~] Cloud sync failed but local apps found. Continuing offline.%E%[0m
 )
+timeout /t 1 >nul
 
 :: STEP 0: App Selection
 :ask_app
