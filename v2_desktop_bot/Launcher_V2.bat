@@ -178,6 +178,47 @@ if not exist "%~dp0node_modules\log-update" (
     timeout /t 1 >nul
 )
 
+:: ── STEP 0: App Selection ───────────────────────────────────────
+:ask_app
+cls
+call :print_header
+echo   %E%[33m  Step 0: Select App%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
+echo.
+echo   %E%[37m  [%E%[33m1%E%[37m] Facebook Lite         %E%[90m(com.facebook.lite)%E%[0m
+echo   %E%[37m  [%E%[33m2%E%[37m] KKH Facebook Lite Pro %E%[90m(app.kkh.pro)%E%[0m
+echo   %E%[37m  [%E%[33m3%E%[37m] LiteX Facebook        %E%[90m(com.facebook.litx)%E%[0m
+echo   %E%[37m  [%E%[33m4%E%[37m] Custom Package Name   %E%[90m(enter manually)%E%[0m
+echo.
+set "APP_CHOICE=1"
+set /p "APP_CHOICE=  %E%[32m>%E%[37m Select app [1-4] (default 1): %E%[0m"
+
+if "!APP_CHOICE!"=="1" (
+    set "APP_KEY=fb_lite"
+    set "APP_DISPLAY=Facebook Lite"
+) else if "!APP_CHOICE!"=="2" (
+    set "APP_KEY=kkh_lite"
+    set "APP_DISPLAY=KKH Lite Pro"
+) else if "!APP_CHOICE!"=="3" (
+    set "APP_KEY=litex"
+    set "APP_DISPLAY=LiteX Facebook"
+) else if "!APP_CHOICE!"=="4" (
+    set "CUSTOM_PKG="
+    set /p "CUSTOM_PKG=  %E%[32m>%E%[37m Enter package name: %E%[0m"
+    if "!CUSTOM_PKG!"=="" (
+        echo  %E%[31m[~] Package name required.%E%[0m
+        timeout /t 1 >nul
+        goto ask_app
+    )
+    set "APP_KEY=custom:!CUSTOM_PKG!"
+    set "APP_DISPLAY=Custom (!CUSTOM_PKG!)"
+) else (
+    set "APP_KEY=fb_lite"
+    set "APP_DISPLAY=Facebook Lite"
+)
+echo   %E%[32m[+]%E%[37m Selected: %E%[33m!APP_DISPLAY!%E%[0m
+timeout /t 1 >nul
+
 :: ── STEP 1: Numbers file ──────────────────────────────────────
 :ask_numbers
 cls
@@ -368,6 +409,7 @@ echo   %E%[33m  READY FOR LAUNCH%E%[0m
 echo   %E%[36m--------------------------------------------------%E%[0m
 echo.
 echo   %E%[32m[+]%E%[37m Engine    : %E%[33mAndroid Emulator (ADB)%E%[0m
+echo   %E%[32m[+]%E%[37m App       : %E%[33m!APP_DISPLAY!%E%[0m
 echo   %E%[32m[+]%E%[37m Targets   : %E%[33m!NUMBERS_FILE!%E%[0m
 echo   %E%[32m[+]%E%[37m Language  : %E%[33m!LANG_CODE!%E%[0m
 echo   %E%[32m[+]%E%[37m Resends   : %E%[33m!RESENDS!%E%[0m
@@ -379,25 +421,23 @@ echo   %E%[36m==================================================%E%[0m
 echo   %E%[33m  EMULATOR SETUP INSTRUCTIONS:%E%[0m
 echo   %E%[37m  1. Open your Android Emulator (MEmu, LDPlayer, etc.)%E%[0m
 echo   %E%[37m  2. Create as many emulator instances as you need (workers).%E%[0m
-echo   %E%[37m  3. Ensure FB Lite is installed on all of them.%E%[0m
-echo   %E%[37m  4. Close FB Lite and leave them on the home screen.%E%[0m
+echo   %E%[37m  3. Ensure %E%[33m!APP_DISPLAY!%E%[37m is installed on all of them.%E%[0m
+echo   %E%[37m  4. Close the app and leave them on the home screen.%E%[0m
 echo   %E%[36m==================================================%E%[0m
 echo.
 set "CONFIRM="
 set /p "CONFIRM=  %E%[32m>%E%[37m Press ENTER to start or N to cancel: %E%[0m"
 if /i "!CONFIRM!"=="N" goto ask_numbers
 
-:: ── COPY NUMBERS FILE ─────────────────────────────────────────
-copy /Y "!NUMBERS_FILE!" "%~dp0..\Number_List.txt" >nul
-
 :: ── RUN ───────────────────────────────────────────────────────
 cls
 echo.
 echo   %E%[33m[*] Starting V2 Emulator Engine...%E%[0m
+echo   %E%[33m[*] App: !APP_DISPLAY!%E%[0m
 echo   %E%[33m[*] Scanning for ADB devices on local network...%E%[0m
 echo.
 
-"!NODE_EXE!" "%~dp0index.js" "!NUMBERS_FILE!" "!RESENDS!" "!LANG_CODE!" "!PROXY_FILE!"
+"!NODE_EXE!" "%~dp0index.js" "!NUMBERS_FILE!" "!RESENDS!" "!LANG_CODE!" "!PROXY_FILE!" "!APP_KEY!"
 
 :: ── DONE ──────────────────────────────────────────────────────
 echo.
