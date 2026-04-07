@@ -449,7 +449,7 @@ if "!NETWORK_MODE!"=="" set "NETWORK_MODE=0"
 
 set "NETWORK_NAME="
 if "!NETWORK_MODE!" neq "0" (
-    set "NETWORK_NAME=!NET_ADAPTER_%NETWORK_MODE%!"
+    for /f "delims=" %%V in ("!NETWORK_MODE!") do set "NETWORK_NAME=!NET_ADAPTER_%%V!"
     if "!NETWORK_NAME!"=="" (
         echo  %E%[31m[~] Invalid selection.%E%[0m
         timeout /t 1 >nul
