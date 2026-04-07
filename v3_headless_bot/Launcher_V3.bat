@@ -429,7 +429,7 @@ echo   %E%[36m--------------------------------------------------%E%[0m
 echo.
 echo   %E%[37m  Available Network Adapters:%E%[0m
 set "NET_ADAPTER_COUNT=0"
-for /f "tokens=1,2,3 delims=|" %%A in ('"!NODE_EXE!" "%~dp0network_bridge.js" list 2^>nul') do (
+for /f "tokens=1,2,3 delims=|" %%A in ('""!NODE_EXE!" "%~dp0network_bridge.js" list" 2^>nul') do (
     set "NET_INDEX=%%A"
     set "NET_NAME=%%B"
     set "NET_IP=%%C"
