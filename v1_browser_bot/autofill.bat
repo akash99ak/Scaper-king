@@ -149,16 +149,28 @@ if not exist "%~dp0node_modules\playwright-extra" (
     echo.
     echo  %E%[33m[*] Installing required Node packages...%E%[0m
     echo.
-    call "!NPM_CMD!" install playwright playwright-extra puppeteer-extra-plugin-stealth axios socks-proxy-agent
+    if exist "%~dp0package.json" (
+        call "!NPM_CMD!" install
+    ) else (
+        call "!NPM_CMD!" install playwright playwright-extra puppeteer-extra-plugin-stealth axios socks-proxy-agent --no-fund
+    )
     if !errorlevel! neq 0 (
-        echo  %E%[31m[~] Install failed. Check your internet connection.%E%[0m
+        echo  %E%[31m[~] Setup failed: Could not install node packages. Please manually open CMD here and run: npm install%E%[0m
         pause
         exit /b 1
     )
     echo  %E%[33m[*] Installing headless Chrome...%E%[0m
     call "!NODE_EXE!" "%~dp0node_modules\.bin\playwright" install chromium
+    echo done > "%~dp0.playwright_installed"
     echo  %E%[32m[+] Setup complete.%E%[0m
     timeout /t 2 >nul
+)
+
+:: Secondary check: If user copied node_modules directly but didn't run the Playwright browser downloader
+if not exist "%~dp0.playwright_installed" (
+    echo  %E%[33m[*] Verifying Playwright browser installation...%E%[0m
+    call "!NODE_EXE!" "%~dp0node_modules\.bin\playwright" install chromium
+    echo done > "%~dp0.playwright_installed"
 )
 
 :: ── STEP 1: Numbers file ──────────────────────────────────────
