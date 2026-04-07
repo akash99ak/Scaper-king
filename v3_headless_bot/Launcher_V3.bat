@@ -433,7 +433,7 @@ for /f "tokens=1,2,3 delims=|" %%A in ('"!NODE_EXE!" network_bridge.js list 2^>n
     set "NET_INDEX=%%A"
     set "NET_NAME=%%B"
     set "NET_IP=%%C"
-    echo   %E%[32m[!NET_INDEX!]%E%[37m !NET_NAME! %E%[90m(!NET_IP!)%E%[0m
+    echo   %E%[32m[!NET_INDEX!]%E%[37m !NET_NAME! %E%[90m^(!NET_IP!^)%E%[0m
     set "NET_ADAPTER_!NET_INDEX!=!NET_NAME!"
     set "NET_ADAPTER_COUNT=!NET_INDEX!"
 )
