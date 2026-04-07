@@ -419,6 +419,49 @@ if "!COUNTRY_CHOICE!"=="9" set "PROXY_COUNTRY=auto"
 goto proxy_done
 
 :proxy_done
+
+:: == STEP 2.5: Network Source =================================
+:ask_network
+cls
+call :print_header
+echo   %E%[33m  Step 2.5: Network Source (Mobile Data)%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
+echo.
+echo   %E%[37m  Available Network Adapters:%E%[0m
+set "NET_ADAPTER_COUNT=0"
+for /f "tokens=1,2,3 delims=|" %%A in ('"!NODE_EXE!" "%~dp0network_bridge.js" list 2^>nul') do (
+    set "NET_INDEX=%%A"
+    set "NET_NAME=%%B"
+    set "NET_IP=%%C"
+    echo   %E%[32m[!NET_INDEX!]%E%[37m !NET_NAME! %E%[90m(!NET_IP!)%E%[0m
+    set "NET_ADAPTER_!NET_INDEX!=!NET_NAME!"
+    set "NET_ADAPTER_COUNT=!NET_INDEX!"
+)
+if "!NET_ADAPTER_COUNT!"=="0" (
+    echo   %E%[31m[!] No IPv4 network adapters found or script missing.%E%[0m
+)
+echo.
+echo   %E%[32m[0]%E%[37m Skip (Use Default PC Network %E%[90m- Ethernet/Wi-Fi%E%[37m)%E%[0m
+echo.
+set "NETWORK_MODE="
+set /p "NETWORK_MODE=  %E%[32m>%E%[37m Select adapter for EMULATORS [0-!NET_ADAPTER_COUNT!] (Default 0): %E%[0m"
+if "!NETWORK_MODE!"=="" set "NETWORK_MODE=0"
+
+set "NETWORK_NAME="
+if "!NETWORK_MODE!" neq "0" (
+    set "NETWORK_NAME=!NET_ADAPTER_%NETWORK_MODE%!"
+    if "!NETWORK_NAME!"=="" (
+        echo  %E%[31m[~] Invalid selection.%E%[0m
+        timeout /t 1 >nul
+        goto ask_network
+    )
+    echo.
+    echo   %E%[32m[+]%E%[37m Bound Emulators to: %E%[33m!NETWORK_NAME!%E%[0m
+    timeout /t 1 >nul
+) else (
+    set "NETWORK_NAME="
+)
+
 goto ask_workers
 
 
@@ -604,6 +647,9 @@ echo   %E%[32m[+]%E%[37m Pattern   : %E%[33m!PROXY_PATTERN!%E%[0m
 echo   %E%[32m[+]%E%[37m Type      : %E%[33mStatic / Unlimited%E%[0m
 )
 )
+if "!NETWORK_NAME!" neq "" (
+echo   %E%[32m[+]%E%[37m Net Bound : %E%[33mMobile Data (!NETWORK_NAME!)%E%[0m
+)
 echo.
 echo   %E%[36m==================================================%E%[0m
 if "!DISPLAY_MODE!"=="2" (
@@ -632,7 +678,7 @@ cls
 echo.
 echo   %E%[33m[*] Starting Headless Engine...%E%[0m
 echo.
-"!NODE_EXE!" "%~dp0index.js" !VISIBLE_FLAG! "!NUMBERS_FILE!" "!PROXY_INPUT!" "!WORKERS!" "!LANG_CODE!" "!RESENDS!" "!SELECTED_APK!" "!PROXY_PROTOCOL!" "!IS_GB_PROXY!" "!PROXY_COUNTRY!" "!PROXY_QUOTA_MB!" "!PROXY_PATTERN!" "!PROXY_METHOD!" "!FB_LANG_TOGGLE!" "!DELAY_MULT!"
+"!NODE_EXE!" "%~dp0index.js" !VISIBLE_FLAG! "!NUMBERS_FILE!" "!PROXY_INPUT!" "!WORKERS!" "!LANG_CODE!" "!RESENDS!" "!SELECTED_APK!" "!PROXY_PROTOCOL!" "!IS_GB_PROXY!" "!PROXY_COUNTRY!" "!PROXY_QUOTA_MB!" "!PROXY_PATTERN!" "!PROXY_METHOD!" "!FB_LANG_TOGGLE!" "!DELAY_MULT!" "!NETWORK_NAME!"
 
 :: == DONE =====================================================
 echo.
