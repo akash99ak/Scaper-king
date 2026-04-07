@@ -648,7 +648,7 @@ echo   %E%[32m[+]%E%[37m Type      : %E%[33mStatic / Unlimited%E%[0m
 )
 )
 if "!NETWORK_NAME!" neq "" (
-echo   %E%[32m[+]%E%[37m Net Bound : %E%[33mMobile Data (!NETWORK_NAME!)%E%[0m
+echo   %E%[32m[+]%E%[37m Net Bound : %E%[33mMobile Data ^(!NETWORK_NAME!^)%E%[0m
 )
 echo.
 echo   %E%[36m==================================================%E%[0m
