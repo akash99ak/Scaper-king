@@ -150,19 +150,31 @@ if "!NODE_EXE!" neq "node" if not exist "!NODE_EXE!" (
     )
 )
 
-:: Install deps if missing
-if not exist "%~dp0node_modules\chalk" (
+:: Install deps if missing (check ALL critical packages, not just chalk)
+set "DEPS_MISSING=0"
+if not exist "%~dp0node_modules\chalk" set "DEPS_MISSING=1"
+if not exist "%~dp0node_modules\fast-xml-parser" set "DEPS_MISSING=1"
+if not exist "%~dp0node_modules\cli-progress" set "DEPS_MISSING=1"
+if not exist "%~dp0node_modules\node-fetch" set "DEPS_MISSING=1"
+if not exist "%~dp0node_modules\unzipper" set "DEPS_MISSING=1"
+if "!DEPS_MISSING!"=="1" (
     cls
     call :print_header
     echo  %E%[33m[*] Installing Headless Engine dependencies...%E%[0m
     echo.
     if exist "%~dp0package.json" (
-        call "!NPM_CMD!" install
+        call "!NPM_CMD!" install --production
     ) else (
-        call "!NPM_CMD!" install unzipper cli-progress node-fetch@2 chalk@4 --no-fund
+        call "!NPM_CMD!" install unzipper cli-progress node-fetch@2 chalk@4 fast-xml-parser --no-fund
     )
     if !errorlevel! neq 0 (
         echo  %E%[31m[~] Setup failed: Could not install node packages. Please manually open CMD here and run: npm install%E%[0m
+        pause
+        exit /b 1
+    )
+    :: Verify critical packages actually installed
+    if not exist "%~dp0node_modules\fast-xml-parser" (
+        echo  %E%[31m[~] Critical package 'fast-xml-parser' missing after install! Run: npm install%E%[0m
         pause
         exit /b 1
     )
@@ -639,13 +651,30 @@ echo.
 echo   %E%[33m[*] Starting Headless Engine...%E%[0m
 echo.
 "!NODE_EXE!" "%~dp0index.js" !VISIBLE_FLAG! "!NUMBERS_FILE!" "!PROXY_INPUT!" "!WORKERS!" "!LANG_CODE!" "!RESENDS!" "!SELECTED_APK!" "!PROXY_PROTOCOL!" "!IS_GB_PROXY!" "!PROXY_COUNTRY!" "!PROXY_QUOTA_MB!" "!PROXY_PATTERN!" "!PROXY_METHOD!" "!FB_LANG_TOGGLE!" "!DELAY_MULT!"
+set "ENGINE_EXIT=!errorlevel!"
 
 :: == DONE =====================================================
 echo.
-echo   %E%[36m==================================================%E%[0m
-echo   %E%[92m  SCRAPER KING%E%[37m -- FINISHED%E%[0m
-echo   %E%[36m==================================================%E%[0m
-echo.
+if "!ENGINE_EXIT!" neq "0" (
+    echo   %E%[31m==================================================%E%[0m
+    echo   %E%[31m  ENGINE CRASHED ^(Exit Code: !ENGINE_EXIT!^)%E%[0m
+    echo   %E%[31m==================================================%E%[0m
+    echo.
+    echo   %E%[33m  Check these files for details:%E%[0m
+    echo   %E%[37m    - %~dp0debug_emu.txt%E%[0m
+    echo   %E%[37m    - %~dp0fatal_error.log%E%[0m
+    echo.
+    echo   %E%[33m  Common fixes:%E%[0m
+    echo   %E%[37m    1. Run: npm install   ^(in this folder^)%E%[0m
+    echo   %E%[37m    2. Make sure Node.js is installed%E%[0m
+    echo   %E%[37m    3. Contact https://t.me/scraper_king%E%[0m
+    echo.
+) else (
+    echo   %E%[36m==================================================%E%[0m
+    echo   %E%[92m  SCRAPER KING%E%[37m -- FINISHED%E%[0m
+    echo   %E%[36m==================================================%E%[0m
+    echo.
+)
 pause
 exit /b
 
