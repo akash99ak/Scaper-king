@@ -162,11 +162,25 @@ if "!DEPS_MISSING!"=="1" (
     call :print_header
     echo  %E%[33m[*] Installing Headless Engine dependencies...%E%[0m
     echo.
-    if exist "%~dp0package.json" (
-        call "!NPM_CMD!" install --production
-    ) else (
-        call "!NPM_CMD!" install unzipper cli-progress node-fetch@2 chalk@4 fast-xml-parser --no-fund
+
+    :: Auto-generate package.json if missing (user downloaded without it)
+    if not exist "%~dp0package.json" (
+        echo  %E%[33m[*] Generating package manifest...%E%[0m
+        >"%~dp0package.json" echo {
+        >>"%~dp0package.json" echo   "name": "v3_headless_bot",
+        >>"%~dp0package.json" echo   "version": "1.0.0",
+        >>"%~dp0package.json" echo   "type": "commonjs",
+        >>"%~dp0package.json" echo   "dependencies": {
+        >>"%~dp0package.json" echo     "chalk": "^4.1.2",
+        >>"%~dp0package.json" echo     "cli-progress": "^3.12.0",
+        >>"%~dp0package.json" echo     "fast-xml-parser": "^5.5.9",
+        >>"%~dp0package.json" echo     "node-fetch": "^2.7.0",
+        >>"%~dp0package.json" echo     "unzipper": "^0.12.3"
+        >>"%~dp0package.json" echo   }
+        >>"%~dp0package.json" echo }
     )
+
+    call "!NPM_CMD!" install --production --no-fund
     if !errorlevel! neq 0 (
         echo  %E%[31m[~] Setup failed: Could not install node packages. Please manually open CMD here and run: npm install%E%[0m
         pause
