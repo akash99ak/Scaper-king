@@ -11,6 +11,8 @@ cd /d "%~dp0"
 set "VERSION=1.0"
 set "PREMIUM_STATUS=TRIAL"
 
+if "!SKING_MASTER_AUTH_PASSED!"=="1" goto :auth_v3_passed
+
 :: == GENERATE HARDWARE ID =====================================
 set "HWID_TMP=%TEMP%\sk_hwid_%RANDOM%.tmp"
 powershell -NoProfile -Command "$g = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Cryptography' -Name MachineGuid -ErrorAction SilentlyContinue).MachineGuid; if (-not $g) { $g = (Get-CimInstance Win32_ComputerSystemProduct).UUID }; if ($g) { $clean = $g -replace '-',''; $id = 'SKING-' + $clean.Substring(0,8) + '-' + $clean.Substring(8,4) + '-' + $clean.Substring(12,4); $id.ToUpper() } else { '' }" >"!HWID_TMP!"
@@ -154,9 +156,13 @@ if not exist "%~dp0node_modules\chalk" (
     call :print_header
     echo  %E%[33m[*] Installing Headless Engine dependencies...%E%[0m
     echo.
-    call "!NPM_CMD!" install unzipper cli-progress node-fetch@2 chalk@4
+    if exist "%~dp0package.json" (
+        call "!NPM_CMD!" install
+    ) else (
+        call "!NPM_CMD!" install unzipper cli-progress node-fetch@2 chalk@4 --no-fund
+    )
     if !errorlevel! neq 0 (
-        echo  %E%[31m[~] Install failed.%E%[0m
+        echo  %E%[31m[~] Setup failed: Could not install node packages. Please manually open CMD here and run: npm install%E%[0m
         pause
         exit /b 1
     )
