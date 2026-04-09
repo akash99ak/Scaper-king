@@ -160,7 +160,11 @@ if not exist "%~dp0node_modules\playwright-extra" (
         exit /b 1
     )
     echo  %E%[33m[*] Installing headless Chrome...%E%[0m
-    call "!NODE_EXE!" "%~dp0node_modules\.bin\playwright" install chromium
+    if exist "%~dp0node_modules\.bin\playwright.cmd" (
+        call "%~dp0node_modules\.bin\playwright.cmd" install chromium
+    ) else (
+        call "!NODE_EXE!" "%~dp0node_modules\playwright-core\cli.js" install chromium
+    )
     echo done > "%~dp0.playwright_installed"
     echo  %E%[32m[+] Setup complete.%E%[0m
     timeout /t 2 >nul
@@ -169,7 +173,11 @@ if not exist "%~dp0node_modules\playwright-extra" (
 :: Secondary check: If user copied node_modules directly but didn't run the Playwright browser downloader
 if not exist "%~dp0.playwright_installed" (
     echo  %E%[33m[*] Verifying Playwright browser installation...%E%[0m
-    call "!NODE_EXE!" "%~dp0node_modules\.bin\playwright" install chromium
+    if exist "%~dp0node_modules\.bin\playwright.cmd" (
+        call "%~dp0node_modules\.bin\playwright.cmd" install chromium
+    ) else (
+        call "!NODE_EXE!" "%~dp0node_modules\playwright-core\cli.js" install chromium
+    )
     echo done > "%~dp0.playwright_installed"
 )
 
