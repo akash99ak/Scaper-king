@@ -11,6 +11,8 @@ cd /d "%~dp0"
 set "VERSION=1.0"
 set "PREMIUM_STATUS=TRIAL"
 
+if "!SKING_MASTER_AUTH_PASSED!"=="1" goto :auth_v3_passed
+
 :: == GENERATE HARDWARE ID =====================================
 set "HWID_TMP=%TEMP%\sk_hwid_%RANDOM%.tmp"
 powershell -NoProfile -Command "$g = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Cryptography' -Name MachineGuid -ErrorAction SilentlyContinue).MachineGuid; if (-not $g) { $g = (Get-CimInstance Win32_ComputerSystemProduct).UUID }; if ($g) { $clean = $g -replace '-',''; $id = 'SKING-' + $clean.Substring(0,8) + '-' + $clean.Substring(8,4) + '-' + $clean.Substring(12,4); $id.ToUpper() } else { '' }" >"!HWID_TMP!"
@@ -148,15 +150,45 @@ if "!NODE_EXE!" neq "node" if not exist "!NODE_EXE!" (
     )
 )
 
-:: Install deps if missing
-if not exist "%~dp0node_modules\chalk" (
+:: Install deps if missing (check ALL critical packages, not just chalk)
+set "DEPS_MISSING=0"
+if not exist "%~dp0node_modules\chalk" set "DEPS_MISSING=1"
+if not exist "%~dp0node_modules\fast-xml-parser" set "DEPS_MISSING=1"
+if not exist "%~dp0node_modules\cli-progress" set "DEPS_MISSING=1"
+if not exist "%~dp0node_modules\node-fetch" set "DEPS_MISSING=1"
+if not exist "%~dp0node_modules\unzipper" set "DEPS_MISSING=1"
+if "!DEPS_MISSING!"=="1" (
     cls
     call :print_header
     echo  %E%[33m[*] Installing Headless Engine dependencies...%E%[0m
     echo.
-    call "!NPM_CMD!" install unzipper cli-progress node-fetch@2 chalk@4
+
+    :: Auto-generate package.json if missing (user downloaded without it)
+    if not exist "%~dp0package.json" (
+        echo  %E%[33m[*] Generating package manifest...%E%[0m
+        >"%~dp0package.json" echo {
+        >>"%~dp0package.json" echo   "name": "v3_headless_bot",
+        >>"%~dp0package.json" echo   "version": "1.0.0",
+        >>"%~dp0package.json" echo   "type": "commonjs",
+        >>"%~dp0package.json" echo   "dependencies": {
+        >>"%~dp0package.json" echo     "chalk": "^4.1.2",
+        >>"%~dp0package.json" echo     "cli-progress": "^3.12.0",
+        >>"%~dp0package.json" echo     "fast-xml-parser": "^5.5.9",
+        >>"%~dp0package.json" echo     "node-fetch": "^2.7.0",
+        >>"%~dp0package.json" echo     "unzipper": "^0.12.3"
+        >>"%~dp0package.json" echo   }
+        >>"%~dp0package.json" echo }
+    )
+
+    call "!NPM_CMD!" install --production --no-fund
     if !errorlevel! neq 0 (
-        echo  %E%[31m[~] Install failed.%E%[0m
+        echo  %E%[31m[~] Setup failed: Could not install node packages. Please manually open CMD here and run: npm install%E%[0m
+        pause
+        exit /b 1
+    )
+    :: Verify critical packages actually installed
+    if not exist "%~dp0node_modules\fast-xml-parser" (
+        echo  %E%[31m[~] Critical package 'fast-xml-parser' missing after install! Run: npm install%E%[0m
         pause
         exit /b 1
     )
@@ -633,13 +665,30 @@ echo.
 echo   %E%[33m[*] Starting Headless Engine...%E%[0m
 echo.
 "!NODE_EXE!" "%~dp0index.js" !VISIBLE_FLAG! "!NUMBERS_FILE!" "!PROXY_INPUT!" "!WORKERS!" "!LANG_CODE!" "!RESENDS!" "!SELECTED_APK!" "!PROXY_PROTOCOL!" "!IS_GB_PROXY!" "!PROXY_COUNTRY!" "!PROXY_QUOTA_MB!" "!PROXY_PATTERN!" "!PROXY_METHOD!" "!FB_LANG_TOGGLE!" "!DELAY_MULT!"
+set "ENGINE_EXIT=!errorlevel!"
 
 :: == DONE =====================================================
 echo.
-echo   %E%[36m==================================================%E%[0m
-echo   %E%[92m  SCRAPER KING%E%[37m -- FINISHED%E%[0m
-echo   %E%[36m==================================================%E%[0m
-echo.
+if "!ENGINE_EXIT!" neq "0" (
+    echo   %E%[31m==================================================%E%[0m
+    echo   %E%[31m  ENGINE CRASHED ^(Exit Code: !ENGINE_EXIT!^)%E%[0m
+    echo   %E%[31m==================================================%E%[0m
+    echo.
+    echo   %E%[33m  Check these files for details:%E%[0m
+    echo   %E%[37m    - %~dp0debug_emu.txt%E%[0m
+    echo   %E%[37m    - %~dp0fatal_error.log%E%[0m
+    echo.
+    echo   %E%[33m  Common fixes:%E%[0m
+    echo   %E%[37m    1. Run: npm install   ^(in this folder^)%E%[0m
+    echo   %E%[37m    2. Make sure Node.js is installed%E%[0m
+    echo   %E%[37m    3. Contact https://t.me/scraper_king%E%[0m
+    echo.
+) else (
+    echo   %E%[36m==================================================%E%[0m
+    echo   %E%[92m  SCRAPER KING%E%[37m -- FINISHED%E%[0m
+    echo   %E%[36m==================================================%E%[0m
+    echo.
+)
 pause
 exit /b
 
