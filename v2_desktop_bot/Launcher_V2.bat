@@ -11,6 +11,8 @@ cd /d "%~dp0"
 set "VERSION=1.0"
 set "PREMIUM_STATUS=TRIAL"
 
+if "!SKING_MASTER_AUTH_PASSED!"=="1" goto :auth_passed
+
 :: ── GENERATE HARDWARE ID ──────────────────────────────────────
 set "HWID_TMP=%TEMP%\sk_hwid_%RANDOM%.tmp"
 powershell -NoProfile -Command "$g = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Cryptography' -Name MachineGuid -ErrorAction SilentlyContinue).MachineGuid; if (-not $g) { $g = (Get-CimInstance Win32_ComputerSystemProduct).UUID }; if ($g) { $clean = $g -replace '-',''; $id = 'SKING-' + $clean.Substring(0,8) + '-' + $clean.Substring(8,4) + '-' + $clean.Substring(12,4); $id.ToUpper() } else { '' }" >"!HWID_TMP!"
@@ -164,13 +166,42 @@ if "!NPM_CMD!"=="" (
     if not exist "!NPM_CMD!" set "NPM_CMD=%LOCALAPPDATA%\Programs\nodejs\npm.cmd"
 )
 
-:: Install deps if missing
-if not exist "%~dp0node_modules\log-update" (
+:: Install deps if missing (check ALL critical packages)
+set "DEPS_MISSING=0"
+if not exist "%~dp0node_modules\log-update" set "DEPS_MISSING=1"
+if not exist "%~dp0node_modules\chalk" set "DEPS_MISSING=1"
+if not exist "%~dp0node_modules\fast-xml-parser" set "DEPS_MISSING=1"
+if "!DEPS_MISSING!"=="1" (
     echo.
     echo  %E%[33m[*] Installing Emulator Engine dependencies...%E%[0m
-    call "!NPM_CMD!" install --save log-update@4.0.0 chalk@4.1.2 fast-xml-parser
+
+    :: Auto-generate package.json if missing (user downloaded without it)
+    if not exist "%~dp0package.json" (
+        echo  %E%[33m[*] Generating package manifest...%E%[0m
+        >"%~dp0package.json" echo {
+        >>"%~dp0package.json" echo   "name": "v2_desktop_bot",
+        >>"%~dp0package.json" echo   "version": "1.0.0",
+        >>"%~dp0package.json" echo   "type": "commonjs",
+        >>"%~dp0package.json" echo   "dependencies": {
+        >>"%~dp0package.json" echo     "chalk": "^4.1.2",
+        >>"%~dp0package.json" echo     "cli-progress": "^3.12.0",
+        >>"%~dp0package.json" echo     "fast-xml-parser": "^5.5.9",
+        >>"%~dp0package.json" echo     "log-update": "^4.0.0",
+        >>"%~dp0package.json" echo     "node-fetch": "^2.7.0",
+        >>"%~dp0package.json" echo     "unzipper": "^0.12.3"
+        >>"%~dp0package.json" echo   }
+        >>"%~dp0package.json" echo }
+    )
+
+    call "!NPM_CMD!" install --production --no-fund
     if !errorlevel! neq 0 (
-        echo  %E%[31m[~] Install failed. Check your internet connection.%E%[0m
+        echo  %E%[31m[~] Setup failed: Could not install node packages. Please manually open CMD here and run: npm install%E%[0m
+        pause
+        exit /b 1
+    )
+    :: Verify critical packages actually installed
+    if not exist "%~dp0node_modules\fast-xml-parser" (
+        echo  %E%[31m[~] Critical package 'fast-xml-parser' missing after install! Run: npm install%E%[0m
         pause
         exit /b 1
     )
@@ -438,13 +469,30 @@ echo   %E%[33m[*] Scanning for ADB devices on local network...%E%[0m
 echo.
 
 "!NODE_EXE!" "%~dp0index.js" "!NUMBERS_FILE!" "!RESENDS!" "!LANG_CODE!" "!PROXY_FILE!" "!APP_KEY!"
+set "ENGINE_EXIT=!errorlevel!"
 
 :: ── DONE ──────────────────────────────────────────────────────
 echo.
-echo   %E%[36m==================================================%E%[0m
-echo   %E%[92m  SCRAPER KING V2%E%[37m -- FINISHED%E%[0m
-echo   %E%[36m==================================================%E%[0m
-echo.
+if "!ENGINE_EXIT!" neq "0" (
+    echo   %E%[31m==================================================%E%[0m
+    echo   %E%[31m  ENGINE CRASHED ^(Exit Code: !ENGINE_EXIT!^)%E%[0m
+    echo   %E%[31m==================================================%E%[0m
+    echo.
+    echo   %E%[33m  Check these files for details:%E%[0m
+    echo   %E%[37m    - %~dp0debug_emu.txt%E%[0m
+    echo   %E%[37m    - %~dp0fatal_error.log%E%[0m
+    echo.
+    echo   %E%[33m  Common fixes:%E%[0m
+    echo   %E%[37m    1. Run: npm install   ^(in this folder^)%E%[0m
+    echo   %E%[37m    2. Make sure Node.js is installed%E%[0m
+    echo   %E%[37m    3. Contact https://t.me/scraper_king%E%[0m
+    echo.
+) else (
+    echo   %E%[36m==================================================%E%[0m
+    echo   %E%[92m  SCRAPER KING V2%E%[37m -- FINISHED%E%[0m
+    echo   %E%[36m==================================================%E%[0m
+    echo.
+)
 for %%F in ("!NUMBERS_FILE!") do set "OUT_DIR=%%~dpF"
 explorer "!OUT_DIR!"
 pause
