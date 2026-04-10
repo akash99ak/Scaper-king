@@ -148,13 +148,16 @@ if "!NODE_EXE!" neq "node" if not exist "!NODE_EXE!" (
     )
 )
 
-:: Install deps if missing
-if not exist "%~dp0node_modules\chalk" (
+:: Install deps if missing (check ALL required packages)
+set "NEED_INSTALL=0"
+if not exist "%~dp0node_modules\chalk" set "NEED_INSTALL=1"
+if not exist "%~dp0node_modules\fast-xml-parser" set "NEED_INSTALL=1"
+if "!NEED_INSTALL!"=="1" (
     cls
     call :print_header
     echo  %E%[33m[*] Installing Headless Engine dependencies...%E%[0m
     echo.
-    call "!NPM_CMD!" install unzipper cli-progress node-fetch@2 chalk@4
+    call "!NPM_CMD!" install unzipper cli-progress node-fetch@2 chalk@4 fast-xml-parser
     if !errorlevel! neq 0 (
         echo  %E%[31m[~] Install failed.%E%[0m
         pause
