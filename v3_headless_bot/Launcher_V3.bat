@@ -78,20 +78,41 @@ if "!NODE_EXE!" neq "node" if not exist "!NODE_EXE!" (
     echo   %E%[36m--------------------------------------------------%E%[0m
     echo.
     echo   %E%[37m  Node.js is not installed on this PC.%E%[0m
-    echo   %E%[37m  Downloading standalone Portable Node.js runtime...%E%[0m
+    echo   %E%[37m  Select a version to download:                    %E%[0m
+    echo.
+    echo   %E%[32m[1]%E%[37m Node.js v20 LTS  %E%[90m(Stable, Recommended for compatibility)%E%[0m
+    echo   %E%[32m[2]%E%[37m Node.js v22 LTS  %E%[90m(Latest LTS, Modern features)%E%[0m
+    echo   %E%[32m[3]%E%[37m Node.js v24      %E%[90m(Cutting Edge, Fastest)%E%[0m
+    echo.
+    set "NODE_CHOICE="
+    set /p "NODE_CHOICE=  %E%[32m>%E%[37m Choice [1-3] (Default 3): %E%[0m"
+    if "!NODE_CHOICE!"=="" set "NODE_CHOICE=3"
+
+    if "!NODE_CHOICE!"=="1" (
+        set "NODE_VER=v20.11.1"
+        set "NODE_FOLDER=node-v20.11.1-win-x64"
+    ) else if "!NODE_CHOICE!"=="2" (
+        set "NODE_VER=v22.12.0"
+        set "NODE_FOLDER=node-v22.12.0-win-x64"
+    ) else (
+        set "NODE_VER=v24.0.0"
+        set "NODE_FOLDER=node-v24.0.0-win-x64"
+    )
+    echo.
+    echo   %E%[37m  Downloading Node.js !NODE_VER! portable runtime...%E%[0m
     echo.
     mkdir "%~dp0..\bin" 2>nul
-    powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://nodejs.org/dist/v20.11.1/node-v20.11.1-win-x64.zip' -OutFile '%~dp0..\bin\node.zip'"
+    powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://nodejs.org/dist/!NODE_VER!/!NODE_FOLDER!.zip' -OutFile '%~dp0..\bin\node.zip'"
     if exist "%~dp0..\bin\node.zip" (
         echo   %E%[33m  Extracting payload...%E%[0m
         powershell -Command "Expand-Archive -Path '%~dp0..\bin\node.zip' -DestinationPath '%~dp0..\bin' -Force"
-        rename "%~dp0..\bin\node-v20.11.1-win-x64" "node"
+        rename "%~dp0..\bin\!NODE_FOLDER!" "node"
         del /q "%~dp0..\bin\node.zip"
         set "NODE_EXE=%~dp0..\bin\node\node.exe"
         set "NPM_CMD=%~dp0..\bin\node\npm.cmd"
         set "PATH=%~dp0..\bin\node;!PATH!"
         echo.
-        echo  %E%[32m[+] Portable Runtime Initialized successfully!%E%[0m
+        echo  %E%[32m[+] Node.js !NODE_VER! Portable Runtime Initialized!%E%[0m
         timeout /t 2 >nul
     ) else (
         echo.
