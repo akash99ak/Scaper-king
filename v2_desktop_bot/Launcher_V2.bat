@@ -460,6 +460,70 @@ set "CONFIRM="
 set /p "CONFIRM=  %E%[32m>%E%[37m Press ENTER to start or N to cancel: %E%[0m"
 if /i "!CONFIRM!"=="N" goto ask_numbers
 
+:: == ACCOUNT CHECKER (PRE-SCAN) ===============================
+cls
+call :print_header
+echo   %E%[33m  Account Scanner (Optional)%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
+echo.
+echo   %E%[37m  Scan numbers for active accounts before cloning?%E%[0m
+echo   %E%[37m  This removes dead numbers, saving emulator time.%E%[0m
+echo.
+echo   %E%[32m[1]%E%[37m Skip (Use numbers as-is)%E%[0m
+echo   %E%[32m[2]%E%[37m Scan and Continue (Filter then clone)%E%[0m
+echo   %E%[32m[3]%E%[37m Scan Only (Filter and exit)%E%[0m
+echo.
+set "SCAN_CHOICE="
+set /p "SCAN_CHOICE=  %E%[32m>%E%[37m Choice [1-3] (Default 1): %E%[0m"
+if "!SCAN_CHOICE!"=="" set "SCAN_CHOICE=1"
+
+if "!SCAN_CHOICE!"=="1" goto skip_checker
+
+echo.
+set "CHECK_THREADS="
+set /p "CHECK_THREADS=  %E%[32m>%E%[37m Checker threads (Default 15): %E%[0m"
+if "!CHECK_THREADS!"=="" set "CHECK_THREADS=15"
+
+echo.
+echo   %E%[32m[1]%E%[37m Overwrite original file%E%[0m
+echo   %E%[32m[2]%E%[37m Save to new file%E%[0m
+echo.
+set "SAVE_CHOICE="
+set /p "SAVE_CHOICE=  %E%[32m>%E%[37m Choice [1-2] (Default 1): %E%[0m"
+if "!SAVE_CHOICE!"=="" set "SAVE_CHOICE=1"
+
+set "CHECKER_OUTPUT="
+if "!SAVE_CHOICE!"=="2" (
+    echo.
+    set /p "CHECKER_OUTPUT=  %E%[32m>%E%[37m Output file path: %E%[0m"
+    set "CHECKER_OUTPUT=!CHECKER_OUTPUT:"=!"
+)
+
+echo.
+echo   %E%[33m[*] Running Account Scanner...%E%[0m
+echo.
+
+if "!SAVE_CHOICE!"=="2" (
+    "!NODE_EXE!" "%~dp0account_checker.js" "!NUMBERS_FILE!" "!CHECK_THREADS!" check "!CHECKER_OUTPUT!"
+    if !errorlevel! equ 0 set "NUMBERS_FILE=!CHECKER_OUTPUT!"
+) else (
+    "!NODE_EXE!" "%~dp0account_checker.js" "!NUMBERS_FILE!" "!CHECK_THREADS!" check
+)
+
+if "!SCAN_CHOICE!"=="3" (
+    echo.
+    echo   %E%[92m  Scan Complete. Exiting.%E%[0m
+    echo.
+    pause
+    exit /b 0
+)
+
+echo.
+echo   %E%[32m[+] Scan complete. Launching bot with filtered numbers...%E%[0m
+timeout /t 2 >nul
+
+:skip_checker
+
 :: ── RUN ───────────────────────────────────────────────────────
 cls
 echo.
