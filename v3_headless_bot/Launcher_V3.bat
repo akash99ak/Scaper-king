@@ -102,7 +102,7 @@ if "!NODE_EXE!" neq "node" if not exist "!NODE_EXE!" (
 )
 
 :: Install deps if missing
-if not exist "%~dp0..\node_modules\playwright-extra" (
+if not exist "%~dp0node_modules\chalk" (
     cls
     call :print_header
     echo  %E%[33m[*] Installing Headless Engine dependencies...%E%[0m
@@ -122,7 +122,7 @@ if not exist "%~dp0..\node_modules\playwright-extra" (
 )
 
 :: == Check if Engine is installed =============================
-if not exist "%~dp0..\engine\adb.exe" (
+if not exist "%~dp0engine\sdk\platform-tools\adb.exe" (
     cls
     call :print_header
     echo   %E%[33m  FIRST-TIME SETUP%E%[0m
@@ -149,31 +149,34 @@ if not exist "%~dp0..\engine\adb.exe" (
 )
 
 :: == Auto-migrate: android-22 image upgrade ===================
-if not exist "%~dp0engine\sdk\system-images\android-22\default\x86\" (
-    cls
-    call :print_header
-    echo   %E%[33m  UPGRADING: Downloading lighter Android 5.1 image...%E%[0m
-    echo   %E%[36m--------------------------------------------------%E%[0m
-    echo.
-    echo   %E%[37m  The engine is switching to Android 5.1 for%E%[0m
-    echo   %E%[37m  drastically lower RAM usage ^(~350MB per instance^).%E%[0m
-    echo   %E%[37m  This is a one-time automatic upgrade.%E%[0m
-    echo.
-    "!NODE_EXE!" "%~dp0setup_engine.js"
-    if !errorlevel! neq 0 (
+:: Only trigger this if the engine SDK is already installed but the image is missing
+if exist "%~dp0engine\sdk\platform-tools\adb.exe" (
+    if not exist "%~dp0engine\sdk\system-images\android-22\default\x86\" (
+        cls
+        call :print_header
+        echo   %E%[33m  UPGRADING: Downloading lighter Android 5.1 image...%E%[0m
+        echo   %E%[36m--------------------------------------------------%E%[0m
         echo.
-        echo  %E%[31m[~] Image download failed. Check your internet.%E%[0m
-        pause
-        exit /b 1
-    )
-    echo.
-    echo  %E%[32m[+] Android 5.1 image ready!%E%[0m
-    timeout /t 2 >nul
-    :: Force AVD re-creation with the new image
-    if exist "%USERPROFILE%\.android\avd\Scraper_King_Base.avd" (
-        echo  %E%[33m[*] Re-creating AVD with new image...%E%[0m
-        rmdir /s /q "%USERPROFILE%\.android\avd\Scraper_King_Base.avd" 2>nul
-        del /f /q "%USERPROFILE%\.android\avd\Scraper_King_Base.ini" 2>nul
+        echo   %E%[37m  The engine is switching to Android 5.1 for%E%[0m
+        echo   %E%[37m  drastically lower RAM usage ^(~350MB per instance^).%E%[0m
+        echo   %E%[37m  This is a one-time automatic upgrade.%E%[0m
+        echo.
+        "!NODE_EXE!" "%~dp0setup_engine.js"
+        if !errorlevel! neq 0 (
+            echo.
+            echo  %E%[31m[~] Image download failed. Check your internet.%E%[0m
+            pause
+            exit /b 1
+        )
+        echo.
+        echo  %E%[32m[+] Android 5.1 image ready!%E%[0m
+        timeout /t 2 >nul
+        :: Force AVD re-creation with the new image
+        if exist "%USERPROFILE%\.android\avd\Scraper_King_Base.avd" (
+            echo  %E%[33m[*] Re-creating AVD with new image...%E%[0m
+            rmdir /s /q "%USERPROFILE%\.android\avd\Scraper_King_Base.avd" 2>nul
+            del /f /q "%USERPROFILE%\.android\avd\Scraper_King_Base.ini" 2>nul
+        )
     )
 )
 
