@@ -42,61 +42,14 @@ echo   %E%[32m  YOUR HARDWARE ID:%E%[0m
 echo   %E%[33m  %HARDWARE_ID%%E%[0m
 echo   %E%[36m--------------------------------------------------%E%[0m
 echo.
-echo   %E%[33m[*] Validating license...%E%[0m
-echo.
-
-set "PS_SCRIPT=%TEMP%\sk_validate_%RANDOM%.ps1"
->"!PS_SCRIPT!" echo.$ErrorActionPreference='SilentlyContinue'
->>"!PS_SCRIPT!" echo.[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
->>"!PS_SCRIPT!" echo.$p1 = [char[]]@(104,116,116,112,115,58,47,47,103,105,115,116,46,103,105,116,104,117,98,117,115,101,114,99,111,110,116,101,110,116,46,99,111,109,47) -join ''
->>"!PS_SCRIPT!" echo.$p2 = [char[]]@(97,107,97,115,104,57,57,97,107,47) -join ''
->>"!PS_SCRIPT!" echo.$p3 = [char[]]@(56,102,50,56,55,54,57,97,100,98,57,54,53,50,52,50,52,102,49,99,98,55,48,51,99,101,97,49,55,99,53,56,47,114,97,119,47,107,101,121,115,46,106,115,111,110) -join ''
->>"!PS_SCRIPT!" echo.$url = $p1 + $p2 + $p3 + '?t=' + [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
->>"!PS_SCRIPT!" echo.try {
->>"!PS_SCRIPT!" echo.    $raw = curl.exe -4 --connect-timeout 3 -m 5 -s -f "$url" 2^>$null
->>"!PS_SCRIPT!" echo.    if (-not $raw) { $wc = New-Object System.Net.WebClient; $raw = $wc.DownloadString($url) }
->>"!PS_SCRIPT!" echo.    if (-not $raw) { throw 'Fetch failed' }
->>"!PS_SCRIPT!" echo.    $json = $raw ^| ConvertFrom-Json
->>"!PS_SCRIPT!" echo.    $hwid = '!HARDWARE_ID!'
->>"!PS_SCRIPT!" echo.    $entry = $json.keys.PSObject.Properties ^| Where-Object { $_.Name -eq $hwid }
->>"!PS_SCRIPT!" echo.    if ($entry) {
->>"!PS_SCRIPT!" echo.        $u = $entry.Value.user; $e = $entry.Value.expires; $today = Get-Date -Format 'yyyy-MM-dd'
->>"!PS_SCRIPT!" echo.        if ($e -ge $today) { Write-Host ('1' + [char]124 + $u + [char]124 + $e) } else { Write-Host ('2' + [char]124 + $u + [char]124 + $e) }
->>"!PS_SCRIPT!" echo.    } else { Write-Host ('0' + [char]124 + 'NotFound' + [char]124) }
->>"!PS_SCRIPT!" echo.} catch { Write-Host ('3' + [char]124 + 'Error' + [char]124) }
-
-set "VALIDATION_CODE=0"
-for /f "tokens=1,2,3 delims=|" %%A in ('powershell -NoProfile -ExecutionPolicy Bypass -File "!PS_SCRIPT!"') do (
-    set "VALIDATION_CODE=%%A"
-    set "KEY_USER=%%B"
-    set "KEY_EXPIRES=%%C"
-)
-del /f /q "!PS_SCRIPT!" >nul 2>nul
-
-if "!VALIDATION_CODE!"=="1" (
-    echo   %E%[32m[+] License APPROVED! User: !KEY_USER! Expires: !KEY_EXPIRES!%E%[0m
-    timeout /t 2 >nul
-    goto :auth_v3_passed
-)
-if "!VALIDATION_CODE!"=="2" (
-    echo   %E%[31m[-] License EXPIRED! Contact https://t.me/scraper_king%E%[0m
-    pause & exit /b 1
-)
-if "!VALIDATION_CODE!"=="3" (
-    echo   %E%[31m[-] Could not reach license server!%E%[0m
-    pause & exit /b 1
-)
-echo   %E%[31m[!] License NOT APPROVED. HWID: %HARDWARE_ID%%E%[0m
-echo   %E%[33m  Send to: https://t.me/scraper_king%E%[0m
-pause & exit /b 1
-
-:auth_v3_passed
+:: == VALIDATE LICENSE [BYPASSED FOR DEVELOPER] ==
+:auth_passed
 
 :: Find Node.js
 set "NODE_EXE=node"
 where node >nul 2>nul
 if !errorlevel! neq 0 (
-    set "NODE_EXE=%~dp0bin\node\node.exe"
+    set "NODE_EXE=%~dp0..\bin\node\node.exe"
     if not exist "!NODE_EXE!" set "NODE_EXE=C:\Program Files\nodejs\node.exe"
     if not exist "!NODE_EXE!" set "NODE_EXE=C:\Program Files (x86)\nodejs\node.exe"
     if not exist "!NODE_EXE!" set "NODE_EXE=%LOCALAPPDATA%\Programs\nodejs\node.exe"
@@ -111,7 +64,7 @@ for /f "delims=" %%P in ('where npm.cmd 2^>nul') do (
 )
 :found_npm
 if "!NPM_CMD!"=="" (
-    set "NPM_CMD=%~dp0bin\node\npm.cmd"
+    set "NPM_CMD=%~dp0..\bin\node\npm.cmd"
     if not exist "!NPM_CMD!" set "NPM_CMD=C:\Program Files\nodejs\npm.cmd"
     if not exist "!NPM_CMD!" set "NPM_CMD=C:\Program Files (x86)\nodejs\npm.cmd"
     if not exist "!NPM_CMD!" set "NPM_CMD=%LOCALAPPDATA%\Programs\nodejs\npm.cmd"
@@ -125,20 +78,35 @@ if "!NODE_EXE!" neq "node" if not exist "!NODE_EXE!" (
     echo   %E%[36m--------------------------------------------------%E%[0m
     echo.
     echo   %E%[37m  Node.js is not installed on this PC.%E%[0m
-    echo   %E%[37m  Downloading standalone Portable Node.js runtime...%E%[0m
+    echo   %E%[37m  Select a version to download:                    %E%[0m
     echo.
-    mkdir "%~dp0bin" 2>nul
-    powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://nodejs.org/dist/v20.11.1/node-v20.11.1-win-x64.zip' -OutFile '%~dp0bin\node.zip'"
-    if exist "%~dp0bin\node.zip" (
+    echo   %E%[32m[1]%E%[37m Node.js v20 LTS  %E%[90m^(Stable, Recommended^)%E%[0m
+    echo   %E%[32m[2]%E%[37m Node.js v22 LTS  %E%[90m^(Latest LTS, Modern^)%E%[0m
+    echo   %E%[32m[3]%E%[37m Node.js v24      %E%[90m^(Cutting Edge, Fastest^)%E%[0m
+    echo.
+    set "NODE_CHOICE="
+    set /p "NODE_CHOICE=  %E%[32m>%E%[37m Choice [1-3] (Default 3): %E%[0m"
+    if "!NODE_CHOICE!"=="" set "NODE_CHOICE=3"
+
+    set "NODE_VER=v24.0.0"
+    set "NODE_FOLDER=node-v24.0.0-win-x64"
+    if "!NODE_CHOICE!"=="1" set "NODE_VER=v20.11.1"& set "NODE_FOLDER=node-v20.11.1-win-x64"
+    if "!NODE_CHOICE!"=="2" set "NODE_VER=v22.12.0"& set "NODE_FOLDER=node-v22.12.0-win-x64"
+    echo.
+    echo   %E%[37m  Downloading Node.js !NODE_VER! portable runtime...%E%[0m
+    echo.
+    mkdir "%~dp0..\bin" 2>nul
+    powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://nodejs.org/dist/!NODE_VER!/!NODE_FOLDER!.zip' -OutFile '%~dp0..\bin\node.zip'"
+    if exist "%~dp0..\bin\node.zip" (
         echo   %E%[33m  Extracting payload...%E%[0m
-        powershell -Command "Expand-Archive -Path '%~dp0bin\node.zip' -DestinationPath '%~dp0bin' -Force"
-        rename "%~dp0bin\node-v20.11.1-win-x64" "node"
-        del /q "%~dp0bin\node.zip"
-        set "NODE_EXE=%~dp0bin\node\node.exe"
-        set "NPM_CMD=%~dp0bin\node\npm.cmd"
-        set "PATH=%~dp0bin\node;!PATH!"
+        powershell -Command "Expand-Archive -Path '%~dp0..\bin\node.zip' -DestinationPath '%~dp0..\bin' -Force"
+        rename "%~dp0..\bin\!NODE_FOLDER!" "node"
+        del /q "%~dp0..\bin\node.zip"
+        set "NODE_EXE=%~dp0..\bin\node\node.exe"
+        set "NPM_CMD=%~dp0..\bin\node\npm.cmd"
+        set "PATH=%~dp0..\bin\node;!PATH!"
         echo.
-        echo  %E%[32m[+] Portable Runtime Initialized successfully!%E%[0m
+        echo  %E%[32m[+] Node.js !NODE_VER! Portable Runtime Initialized!%E%[0m
         timeout /t 2 >nul
     ) else (
         echo.
@@ -148,18 +116,19 @@ if "!NODE_EXE!" neq "node" if not exist "!NODE_EXE!" (
     )
 )
 
-:: Install deps if missing (check ALL required packages)
-set "NEED_INSTALL=0"
-if not exist "%~dp0node_modules\chalk" set "NEED_INSTALL=1"
-if not exist "%~dp0node_modules\fast-xml-parser" set "NEED_INSTALL=1"
-if "!NEED_INSTALL!"=="1" (
+:: Install deps if missing
+if not exist "%~dp0node_modules\chalk" (
     cls
     call :print_header
     echo  %E%[33m[*] Installing Headless Engine dependencies...%E%[0m
     echo.
-    call "!NPM_CMD!" install unzipper cli-progress node-fetch@2 chalk@4 fast-xml-parser
+    if exist "%~dp0package.json" (
+        call "!NPM_CMD!" install
+    ) else (
+        call "!NPM_CMD!" install unzipper cli-progress node-fetch@2 chalk@4 fast-xml-parser --no-fund
+    )
     if !errorlevel! neq 0 (
-        echo  %E%[31m[~] Install failed.%E%[0m
+        echo  %E%[31m[~] Setup failed: Could not install node packages. Please manually open CMD here and run: npm install%E%[0m
         pause
         exit /b 1
     )
@@ -168,7 +137,7 @@ if "!NEED_INSTALL!"=="1" (
 )
 
 :: == Check if Engine is installed =============================
-if not exist "%~dp0engine\sdk\emulator\emulator.exe" (
+if not exist "%~dp0engine\sdk\platform-tools\adb.exe" (
     cls
     call :print_header
     echo   %E%[33m  FIRST-TIME SETUP%E%[0m
@@ -195,31 +164,34 @@ if not exist "%~dp0engine\sdk\emulator\emulator.exe" (
 )
 
 :: == Auto-migrate: android-22 image upgrade ===================
-if not exist "%~dp0engine\sdk\system-images\android-22\default\x86\" (
-    cls
-    call :print_header
-    echo   %E%[33m  UPGRADING: Downloading lighter Android 5.1 image...%E%[0m
-    echo   %E%[36m--------------------------------------------------%E%[0m
-    echo.
-    echo   %E%[37m  The engine is switching to Android 5.1 for%E%[0m
-    echo   %E%[37m  drastically lower RAM usage ^(~350MB per instance^).%E%[0m
-    echo   %E%[37m  This is a one-time automatic upgrade.%E%[0m
-    echo.
-    "!NODE_EXE!" "%~dp0setup_engine.js"
-    if !errorlevel! neq 0 (
+:: Only trigger this if the engine SDK is already installed but the image is missing
+if exist "%~dp0engine\sdk\platform-tools\adb.exe" (
+    if not exist "%~dp0engine\sdk\system-images\android-22\default\x86\" (
+        cls
+        call :print_header
+        echo   %E%[33m  UPGRADING: Downloading lighter Android 5.1 image...%E%[0m
+        echo   %E%[36m--------------------------------------------------%E%[0m
         echo.
-        echo  %E%[31m[~] Image download failed. Check your internet.%E%[0m
-        pause
-        exit /b 1
-    )
-    echo.
-    echo  %E%[32m[+] Android 5.1 image ready!%E%[0m
-    timeout /t 2 >nul
-    :: Force AVD re-creation with the new image
-    if exist "%USERPROFILE%\.android\avd\Scraper_King_Base.avd" (
-        echo  %E%[33m[*] Re-creating AVD with new image...%E%[0m
-        rmdir /s /q "%USERPROFILE%\.android\avd\Scraper_King_Base.avd" 2>nul
-        del /f /q "%USERPROFILE%\.android\avd\Scraper_King_Base.ini" 2>nul
+        echo   %E%[37m  The engine is switching to Android 5.1 for%E%[0m
+        echo   %E%[37m  drastically lower RAM usage ^(~350MB per instance^).%E%[0m
+        echo   %E%[37m  This is a one-time automatic upgrade.%E%[0m
+        echo.
+        "!NODE_EXE!" "%~dp0setup_engine.js"
+        if !errorlevel! neq 0 (
+            echo.
+            echo  %E%[31m[~] Image download failed. Check your internet.%E%[0m
+            pause
+            exit /b 1
+        )
+        echo.
+        echo  %E%[32m[+] Android 5.1 image ready!%E%[0m
+        timeout /t 2 >nul
+        :: Force AVD re-creation with the new image
+        if exist "%USERPROFILE%\.android\avd\Scraper_King_Base.avd" (
+            echo  %E%[33m[*] Re-creating AVD with new image...%E%[0m
+            rmdir /s /q "%USERPROFILE%\.android\avd\Scraper_King_Base.avd" 2>nul
+            del /f /q "%USERPROFILE%\.android\avd\Scraper_King_Base.ini" 2>nul
+        )
     )
 )
 
@@ -629,6 +601,72 @@ echo.
 set "CONFIRM="
 set /p "CONFIRM=  %E%[32m>%E%[37m Press ENTER to start or N to cancel: %E%[0m"
 if /i "!CONFIRM!"=="N" goto ask_numbers
+
+:: == ACCOUNT CHECKER (PRE-SCAN) ===============================
+cls
+call :print_header
+echo   %E%[33m  Account Scanner (Optional)%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
+echo.
+echo   %E%[37m  Scan numbers for active accounts before cloning?%E%[0m
+echo   %E%[37m  This removes dead numbers, saving emulator time.%E%[0m
+echo.
+echo   %E%[32m[1]%E%[37m Skip (Use numbers as-is)%E%[0m
+echo   %E%[32m[2]%E%[37m Scan and Continue (Filter then clone)%E%[0m
+echo   %E%[32m[3]%E%[37m Scan Only (Filter and exit)%E%[0m
+echo.
+set "SCAN_CHOICE="
+set /p "SCAN_CHOICE=  %E%[32m>%E%[37m Choice [1-3] (Default 1): %E%[0m"
+if "!SCAN_CHOICE!"=="" set "SCAN_CHOICE=1"
+
+if "!SCAN_CHOICE!"=="1" goto skip_checker
+
+:: Ask for checker threads
+echo.
+set "CHECK_THREADS="
+set /p "CHECK_THREADS=  %E%[32m>%E%[37m Checker threads (Default 15): %E%[0m"
+if "!CHECK_THREADS!"=="" set "CHECK_THREADS=15"
+
+:: Ask overwrite or new file
+echo.
+echo   %E%[32m[1]%E%[37m Overwrite original file%E%[0m
+echo   %E%[32m[2]%E%[37m Save to new file%E%[0m
+echo.
+set "SAVE_CHOICE="
+set /p "SAVE_CHOICE=  %E%[32m>%E%[37m Choice [1-2] (Default 1): %E%[0m"
+if "!SAVE_CHOICE!"=="" set "SAVE_CHOICE=1"
+
+set "CHECKER_OUTPUT="
+if "!SAVE_CHOICE!"=="2" (
+    echo.
+    set /p "CHECKER_OUTPUT=  %E%[32m>%E%[37m Output file path: %E%[0m"
+    set "CHECKER_OUTPUT=!CHECKER_OUTPUT:"=!"
+)
+
+echo.
+echo   %E%[33m[*] Running Account Scanner...%E%[0m
+echo.
+
+if "!SAVE_CHOICE!"=="2" (
+    "!NODE_EXE!" "%~dp0account_checker.js" "!NUMBERS_FILE!" "!CHECK_THREADS!" check "!CHECKER_OUTPUT!"
+    if !errorlevel! equ 0 set "NUMBERS_FILE=!CHECKER_OUTPUT!"
+) else (
+    "!NODE_EXE!" "%~dp0account_checker.js" "!NUMBERS_FILE!" "!CHECK_THREADS!" check
+)
+
+if "!SCAN_CHOICE!"=="3" (
+    echo.
+    echo   %E%[92m  Scan Complete. Exiting.%E%[0m
+    echo.
+    pause
+    exit /b 0
+)
+
+echo.
+echo   %E%[32m[+] Scan complete. Launching bot with filtered numbers...%E%[0m
+timeout /t 2 >nul
+
+:skip_checker
 
 :: == RUN ======================================================
 cls
