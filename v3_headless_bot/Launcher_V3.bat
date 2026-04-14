@@ -116,8 +116,14 @@ if "!NODE_EXE!" neq "node" if not exist "!NODE_EXE!" (
     )
 )
 
-:: Install deps if missing
-if not exist "%~dp0node_modules\chalk" (
+:: Install deps if ANY critical module is missing
+set "NEED_INSTALL=0"
+if not exist "%~dp0node_modules\chalk" set "NEED_INSTALL=1"
+if not exist "%~dp0node_modules\fast-xml-parser" set "NEED_INSTALL=1"
+if not exist "%~dp0node_modules\unzipper" set "NEED_INSTALL=1"
+if not exist "%~dp0node_modules\cli-progress" set "NEED_INSTALL=1"
+if not exist "%~dp0node_modules\node-fetch" set "NEED_INSTALL=1"
+if "!NEED_INSTALL!"=="1" (
     cls
     call :print_header
     echo  %E%[33m[*] Installing Headless Engine dependencies...%E%[0m
