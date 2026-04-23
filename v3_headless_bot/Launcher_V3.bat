@@ -44,7 +44,8 @@ echo   %E%[36m--------------------------------------------------%E%[0m
 echo.
 :: == VALIDATE LICENSE [BYPASSED FOR DEVELOPER] ==
 :auth_passed
-
+:: Suppress deprecation warnings for punycode
+set "NODE_OPTIONS=--no-warnings"
 :: Find Node.js
 set "NODE_EXE=node"
 where node >nul 2>nul
@@ -679,6 +680,7 @@ cls
 echo.
 echo   %E%[33m[*] Starting Headless Engine...%E%[0m
 echo.
+set "NODE_OPTIONS=--no-deprecation"
 "!NODE_EXE!" "%~dp0index.js" !VISIBLE_FLAG! "!NUMBERS_FILE!" "!PROXY_INPUT!" "!WORKERS!" "!LANG_CODE!" "!RESENDS!" "!SELECTED_APK!" "!PROXY_PROTOCOL!" "!IS_GB_PROXY!" "!PROXY_COUNTRY!" "!PROXY_QUOTA_MB!" "!PROXY_PATTERN!" "!PROXY_METHOD!" "!FB_LANG_TOGGLE!" "!DELAY_MULT!"
 
 :: == DONE =====================================================
