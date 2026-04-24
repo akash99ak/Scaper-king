@@ -115,6 +115,9 @@ pause & exit /b 1
 :: ══════════════════════════════════════════════════════════════
 :auth_passed
 
+:: Suppress deprecation warnings for punycode
+set "NODE_OPTIONS=--no-warnings"
+
 :: Find Node.js (with auto-download for new users)
 set "NODE_EXE=node"
 where node >nul 2>nul
@@ -219,10 +222,11 @@ echo.
 echo   %E%[37m  [%E%[33m1%E%[37m] Facebook Lite         %E%[90m(com.facebook.lite)%E%[0m
 echo   %E%[37m  [%E%[33m2%E%[37m] KKH Facebook Lite Pro %E%[90m(app.kkh.pro)%E%[0m
 echo   %E%[37m  [%E%[33m3%E%[37m] LiteX Facebook        %E%[90m(com.facebook.litx)%E%[0m
-echo   %E%[37m  [%E%[33m4%E%[37m] Custom Package Name   %E%[90m(enter manually)%E%[0m
+echo   %E%[37m  [%E%[33m4%E%[37m] Messenger             %E%[90m(com.facebook.orca)%E%[0m
+echo   %E%[37m  [%E%[33m5%E%[37m] Custom Package Name   %E%[90m(enter manually)%E%[0m
 echo.
 set "APP_CHOICE=1"
-set /p "APP_CHOICE=  %E%[32m>%E%[37m Select app [1-4] (default 1): %E%[0m"
+set /p "APP_CHOICE=  %E%[32m>%E%[37m Select app [1-5] (default 1): %E%[0m"
 
 if "!APP_CHOICE!"=="1" (
     set "APP_KEY=fb_lite"
@@ -234,6 +238,9 @@ if "!APP_CHOICE!"=="1" (
     set "APP_KEY=litex"
     set "APP_DISPLAY=LiteX Facebook"
 ) else if "!APP_CHOICE!"=="4" (
+    set "APP_KEY=messenger"
+    set "APP_DISPLAY=Messenger"
+) else if "!APP_CHOICE!"=="5" (
     set "CUSTOM_PKG="
     set /p "CUSTOM_PKG=  %E%[32m>%E%[37m Enter package name: %E%[0m"
     if "!CUSTOM_PKG!"=="" (
@@ -433,6 +440,58 @@ set "RESENDS="
 set /p "RESENDS=  %E%[32m>%E%[37m Resends [0-5] (Default 0): %E%[0m"
 if "!RESENDS!"=="" set "RESENDS=0"
 
+:: ── STEP 5: CAPTCHA Configuration ──────────────────────────
+:ask_captcha
+set "CFG_PATH=%~dp0captcha_config.json"
+cls
+call :print_header
+echo   %E%[33m  Step 5: CAPTCHA Solver%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
+echo.
+echo   %E%[37m  The bot can solve text CAPTCHAs automatically%E%[0m
+echo   %E%[37m  by reading them from the screen (FREE, no API needed).%E%[0m
+echo.
+echo   %E%[37m  For IMAGE CAPTCHAs, choose an option:%E%[0m
+echo.
+echo   %E%[32m[1]%E%[37m Free (text-based solver only, no API)%E%[0m
+echo   %E%[32m[2]%E%[37m 2Captcha API key%E%[0m
+echo   %E%[32m[3]%E%[37m Anti-Captcha API key%E%[0m
+echo   %E%[32m[4]%E%[37m Manual (bot pauses, YOU type it)%E%[0m
+echo.
+set "CAPTCHA_CHOICE="
+set /p "CAPTCHA_CHOICE=  %E%[32m>%E%[37m Choice [1-4] (Default 4): %E%[0m"
+if "!CAPTCHA_CHOICE!"=="" set "CAPTCHA_CHOICE=4"
+
+set "CAPTCHA_SERVICE=none"
+set "CAPTCHA_KEY="
+
+if "!CAPTCHA_CHOICE!"=="2" (
+    set /p "CAPTCHA_KEY=  %E%[32m>%E%[37m Enter 2Captcha API key: %E%[0m"
+    if "!CAPTCHA_KEY!" neq "" (
+        set "CAPTCHA_SERVICE=2captcha"
+        >"!CFG_PATH!" echo {"service":"2captcha","apiKey":"!CAPTCHA_KEY!"}
+        echo  %E%[32m[+] 2Captcha configured.%E%[0m
+    ) else (
+        echo  %E%[33m[~] No key provided, using free solver.%E%[0m
+    )
+) else if "!CAPTCHA_CHOICE!"=="3" (
+    set /p "CAPTCHA_KEY=  %E%[32m>%E%[37m Enter Anti-Captcha API key: %E%[0m"
+    if "!CAPTCHA_KEY!" neq "" (
+        set "CAPTCHA_SERVICE=anticaptcha"
+        >"!CFG_PATH!" echo {"service":"anticaptcha","apiKey":"!CAPTCHA_KEY!"}
+        echo  %E%[32m[+] Anti-Captcha configured.%E%[0m
+    ) else (
+        echo  %E%[33m[~] No key provided, using free solver.%E%[0m
+    )
+) else if "!CAPTCHA_CHOICE!"=="4" (
+    set "CAPTCHA_SERVICE=manual"
+    >"!CFG_PATH!" echo {"mode":"manual"}
+    echo  %E%[32m[+] Manual mode: Bot will PAUSE at CAPTCHA for you to type it.%E%[0m
+) else (
+    echo  %E%[32m[+] Using free text-based CAPTCHA solver.%E%[0m
+)
+timeout /t 1 >nul
+
 :: ── CONFIRM ───────────────────────────────────────────────────
 cls
 call :print_header
@@ -444,6 +503,10 @@ echo   %E%[32m[+]%E%[37m App       : %E%[33m!APP_DISPLAY!%E%[0m
 echo   %E%[32m[+]%E%[37m Targets   : %E%[33m!NUMBERS_FILE!%E%[0m
 echo   %E%[32m[+]%E%[37m Language  : %E%[33m!LANG_CODE!%E%[0m
 echo   %E%[32m[+]%E%[37m Resends   : %E%[33m!RESENDS!%E%[0m
+if "!CAPTCHA_SERVICE!"=="none" echo   %E%[32m[+]%E%[37m CAPTCHA   : %E%[33mFree (text-based)%E%[0m
+if "!CAPTCHA_SERVICE!"=="2captcha" echo   %E%[32m[+]%E%[37m CAPTCHA   : %E%[33m2Captcha API%E%[0m
+if "!CAPTCHA_SERVICE!"=="anticaptcha" echo   %E%[32m[+]%E%[37m CAPTCHA   : %E%[33mAnti-Captcha API%E%[0m
+if "!CAPTCHA_SERVICE!"=="manual" echo   %E%[32m[+]%E%[37m CAPTCHA   : %E%[33mManual (bot pauses for you)%E%[0m
 if not defined PROXY_FILE echo   %E%[32m[+]%E%[37m Proxy     : %E%[33mNone (Local IP)%E%[0m
 if defined PROXY_FILE echo   %E%[32m[+]%E%[37m Proxy     : %E%[33m!PROXY_FILE!%E%[0m
 echo   %E%[32m[+]%E%[37m Detection : %E%[33mAuto (MEmu/LDPlayer TCP Scan)%E%[0m
