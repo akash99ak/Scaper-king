@@ -605,6 +605,60 @@ set /p "DELAY_MULT=  %E%[32m>%E%[37m Custom Delay Multiplier (1.0 = Normal, 2.0 
 if "!DELAY_MULT!"=="" set "DELAY_MULT=1.0"
 echo.
 
+:: == STEP 7: Timezone =========================================
+:ask_timezone
+cls
+call :print_header
+echo   %E%[33m  Step 7: Device Timezone%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
+echo.
+echo   %E%[32m[1]%E%[37m Auto (Match number country code)%E%[0m
+echo   %E%[32m[2]%E%[37m System Default (Current PC Timezone)%E%[0m
+echo   %E%[32m[3]%E%[37m Custom Timezone (e.g. Asia/Dhaka)%E%[0m
+echo   %E%[32m[4]%E%[37m Custom GMT (e.g. GMT+6, GMT-5)%E%[0m
+echo.
+set "TZ_CHOICE="
+set /p "TZ_CHOICE=  %E%[32m>%E%[37m Choice [1-4] (Default 1): %E%[0m"
+if "!TZ_CHOICE!"=="" set "TZ_CHOICE=1"
+
+set "DEVICE_TZ=auto"
+if "!TZ_CHOICE!"=="2" set "DEVICE_TZ=default"
+if "!TZ_CHOICE!"=="3" (
+    echo.
+    set /p "DEVICE_TZ=  %E%[32m>%E%[37m Enter Timezone (e.g. Asia/Dhaka): %E%[0m"
+    if "!DEVICE_TZ!"=="" set "DEVICE_TZ=auto"
+)
+if "!TZ_CHOICE!"=="4" (
+    echo.
+    set /p "DEVICE_TZ=  %E%[32m>%E%[37m Enter GMT (e.g. GMT+6): %E%[0m"
+    if "!DEVICE_TZ!"=="" set "DEVICE_TZ=auto"
+)
+echo.
+
+:: == STEP 8: Emulator Country =================================
+:ask_country
+cls
+call :print_header
+echo   %E%[33m  Step 8: Device Country%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
+echo.
+echo   %E%[32m[1]%E%[37m Auto (Match number country code)%E%[0m
+echo   %E%[32m[2]%E%[37m Match Language (e.g. US for English)%E%[0m
+echo   %E%[32m[3]%E%[37m Custom Country Code (e.g. BD, BR, ID)%E%[0m
+echo.
+set "COUNTRY_CHOICE="
+set /p "COUNTRY_CHOICE=  %E%[32m>%E%[37m Choice [1-3] (Default 1): %E%[0m"
+if "!COUNTRY_CHOICE!"=="" set "COUNTRY_CHOICE=1"
+
+set "DEVICE_COUNTRY=auto"
+if "!COUNTRY_CHOICE!"=="2" set "DEVICE_COUNTRY=language"
+if "!COUNTRY_CHOICE!"=="3" (
+    echo.
+    set /p "DEVICE_COUNTRY=  %E%[32m>%E%[37m Enter 2-Letter Country Code (e.g. BD): %E%[0m"
+    if "!DEVICE_COUNTRY!"=="" set "DEVICE_COUNTRY=auto"
+)
+echo.
+
 set "CONFIRM="
 set /p "CONFIRM=  %E%[32m>%E%[37m Press ENTER to start or N to cancel: %E%[0m"
 if /i "!CONFIRM!"=="N" goto ask_numbers
@@ -680,7 +734,8 @@ cls
 echo.
 echo   %E%[33m[*] Starting Headless Engine...%E%[0m
 echo.
-"!NODE_EXE!" "%~dp0index.js" !VISIBLE_FLAG! "!NUMBERS_FILE!" "!PROXY_INPUT!" "!WORKERS!" "!LANG_CODE!" "!RESENDS!" "!SELECTED_APK!" "!PROXY_PROTOCOL!" "!IS_GB_PROXY!" "!PROXY_COUNTRY!" "!PROXY_QUOTA_MB!" "!PROXY_PATTERN!" "!PROXY_METHOD!" "!FB_LANG_TOGGLE!" "!DELAY_MULT!"
+set "NODE_OPTIONS=--no-deprecation"
+"!NODE_EXE!" "%~dp0index.js" !VISIBLE_FLAG! "!NUMBERS_FILE!" "!PROXY_INPUT!" "!WORKERS!" "!LANG_CODE!" "!RESENDS!" "!SELECTED_APK!" "!PROXY_PROTOCOL!" "!IS_GB_PROXY!" "!PROXY_COUNTRY!" "!PROXY_QUOTA_MB!" "!PROXY_PATTERN!" "!PROXY_METHOD!" "!FB_LANG_TOGGLE!" "!DELAY_MULT!" "!DEVICE_TZ!" "!DEVICE_COUNTRY!"
 
 :: == DONE =====================================================
 echo.
