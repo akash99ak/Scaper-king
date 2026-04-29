@@ -440,57 +440,65 @@ set "RESENDS="
 set /p "RESENDS=  %E%[32m>%E%[37m Resends [0-5] (Default 0): %E%[0m"
 if "!RESENDS!"=="" set "RESENDS=0"
 
-:: ── STEP 5: CAPTCHA Configuration ──────────────────────────
+:: ── STEP 5: CAPTCHA Solver Configuration ──────────────────────
 :ask_captcha
-set "CFG_PATH=%~dp0captcha_config.json"
+set "CFG_PATH=%~dp0..\captcha_config.json"
 cls
 call :print_header
 echo   %E%[33m  Step 5: CAPTCHA Solver%E%[0m
 echo   %E%[36m--------------------------------------------------%E%[0m
 echo.
-echo   %E%[37m  The bot can solve text CAPTCHAs automatically%E%[0m
-echo   %E%[37m  by reading them from the screen (FREE, no API needed).%E%[0m
+echo   %E%[37m  When bot encounters a CAPTCHA, choose how to handle it:%E%[0m
 echo.
-echo   %E%[37m  For IMAGE CAPTCHAs, choose an option:%E%[0m
-echo.
-echo   %E%[32m[1]%E%[37m Free (text-based solver only, no API)%E%[0m
-echo   %E%[32m[2]%E%[37m 2Captcha API key%E%[0m
-echo   %E%[32m[3]%E%[37m Anti-Captcha API key%E%[0m
-echo   %E%[32m[4]%E%[37m Manual (bot pauses, YOU type it)%E%[0m
+echo   %E%[32m[1]%E%[37m Skip (No CAPTCHA solving, restart on CAPTCHA)%E%[0m
+echo   %E%[32m[2]%E%[37m 2Captcha API    %E%[90m(https://2captcha.com)%E%[0m
+echo   %E%[32m[3]%E%[37m Anti-Captcha API %E%[90m(https://anti-captcha.com)%E%[0m
+echo   %E%[32m[4]%E%[37m Manual (bot PAUSES, YOU type it, bot auto-resumes)%E%[0m
 echo.
 set "CAPTCHA_CHOICE="
 set /p "CAPTCHA_CHOICE=  %E%[32m>%E%[37m Choice [1-4] (Default 4): %E%[0m"
 if "!CAPTCHA_CHOICE!"=="" set "CAPTCHA_CHOICE=4"
 
-set "CAPTCHA_SERVICE=none"
+set "CAPTCHA_SERVICE="
 set "CAPTCHA_KEY="
 
 if "!CAPTCHA_CHOICE!"=="2" (
-    set /p "CAPTCHA_KEY=  %E%[32m>%E%[37m Enter 2Captcha API key: %E%[0m"
-    if "!CAPTCHA_KEY!" neq "" (
-        set "CAPTCHA_SERVICE=2captcha"
-        >"!CFG_PATH!" echo {"service":"2captcha","apiKey":"!CAPTCHA_KEY!"}
-        echo  %E%[32m[+] 2Captcha configured.%E%[0m
-    ) else (
-        echo  %E%[33m[~] No key provided, using free solver.%E%[0m
-    )
+    set "CAPTCHA_SERVICE=2captcha"
+    set /p "CAPTCHA_KEY=  %E%[32m>%E%[37m Enter 2Captcha API Key: %E%[0m"
 ) else if "!CAPTCHA_CHOICE!"=="3" (
-    set /p "CAPTCHA_KEY=  %E%[32m>%E%[37m Enter Anti-Captcha API key: %E%[0m"
-    if "!CAPTCHA_KEY!" neq "" (
-        set "CAPTCHA_SERVICE=anticaptcha"
-        >"!CFG_PATH!" echo {"service":"anticaptcha","apiKey":"!CAPTCHA_KEY!"}
-        echo  %E%[32m[+] Anti-Captcha configured.%E%[0m
+    set "CAPTCHA_SERVICE=anticaptcha"
+    set /p "CAPTCHA_KEY=  %E%[32m>%E%[37m Enter Anti-Captcha API Key: %E%[0m"
+    echo.
+    echo  %E%[33m[*] Checking Anti-Captcha SDK...%E%[0m
+    if not exist "%~dp0node_modules\@antiadmin\anticaptchaofficial" (
+        echo  %E%[33m[*] Installing @antiadmin/anticaptchaofficial...%E%[0m
+        "!NODE_EXE!" -e "process.exit(0)" >nul 2>nul
+        pushd "%~dp0"
+        "!NODE_EXE!" "%~dp0..\..\..\..\..\node_modules\npm\bin\npm-cli.js" install @antiadmin/anticaptchaofficial >nul 2>nul || npm install @antiadmin/anticaptchaofficial >nul 2>nul
+        popd
+        if exist "%~dp0node_modules\@antiadmin\anticaptchaofficial" (
+            echo  %E%[32m[+] Anti-Captcha SDK installed successfully!%E%[0m
+        ) else (
+            echo  %E%[31m[-] SDK install failed. Will use HTTP fallback.%E%[0m
+        )
     ) else (
-        echo  %E%[33m[~] No key provided, using free solver.%E%[0m
+        echo  %E%[32m[+] Anti-Captcha SDK already installed.%E%[0m
     )
 ) else if "!CAPTCHA_CHOICE!"=="4" (
     set "CAPTCHA_SERVICE=manual"
-    >"!CFG_PATH!" echo {"mode":"manual"}
-    echo  %E%[32m[+] Manual mode: Bot will PAUSE at CAPTCHA for you to type it.%E%[0m
-) else (
-    echo  %E%[32m[+] Using free text-based CAPTCHA solver.%E%[0m
 )
-timeout /t 1 >nul
+
+if "!CAPTCHA_SERVICE!"=="manual" (
+    echo {"mode": "manual"} > "!CFG_PATH!"
+    echo  %E%[32m[+] Manual mode: Bot will PAUSE at CAPTCHA for you to type it.%E%[0m
+    timeout /t 1 >nul
+) else if defined CAPTCHA_KEY if "!CAPTCHA_KEY!" neq "" (
+    echo {"service": "!CAPTCHA_SERVICE!", "apiKey": "!CAPTCHA_KEY!"} > "!CFG_PATH!"
+    echo  %E%[32m[+] CAPTCHA solver configured: !CAPTCHA_SERVICE!%E%[0m
+    timeout /t 1 >nul
+) else (
+    echo {"service": "2captcha", "apiKey": ""} > "!CFG_PATH!"
+)
 
 :: ── CONFIRM ───────────────────────────────────────────────────
 cls
@@ -503,12 +511,12 @@ echo   %E%[32m[+]%E%[37m App       : %E%[33m!APP_DISPLAY!%E%[0m
 echo   %E%[32m[+]%E%[37m Targets   : %E%[33m!NUMBERS_FILE!%E%[0m
 echo   %E%[32m[+]%E%[37m Language  : %E%[33m!LANG_CODE!%E%[0m
 echo   %E%[32m[+]%E%[37m Resends   : %E%[33m!RESENDS!%E%[0m
-if "!CAPTCHA_SERVICE!"=="none" echo   %E%[32m[+]%E%[37m CAPTCHA   : %E%[33mFree (text-based)%E%[0m
-if "!CAPTCHA_SERVICE!"=="2captcha" echo   %E%[32m[+]%E%[37m CAPTCHA   : %E%[33m2Captcha API%E%[0m
-if "!CAPTCHA_SERVICE!"=="anticaptcha" echo   %E%[32m[+]%E%[37m CAPTCHA   : %E%[33mAnti-Captcha API%E%[0m
-if "!CAPTCHA_SERVICE!"=="manual" echo   %E%[32m[+]%E%[37m CAPTCHA   : %E%[33mManual (bot pauses for you)%E%[0m
 if not defined PROXY_FILE echo   %E%[32m[+]%E%[37m Proxy     : %E%[33mNone (Local IP)%E%[0m
 if defined PROXY_FILE echo   %E%[32m[+]%E%[37m Proxy     : %E%[33m!PROXY_FILE!%E%[0m
+if "!CAPTCHA_SERVICE!"=="manual" echo   %E%[32m[+]%E%[37m CAPTCHA   : %E%[33mManual (bot pauses for you)%E%[0m
+if "!CAPTCHA_SERVICE!"=="2captcha" echo   %E%[32m[+]%E%[37m CAPTCHA   : %E%[33m2captcha (Auto-Solve ON)%E%[0m
+if "!CAPTCHA_SERVICE!"=="anticaptcha" echo   %E%[32m[+]%E%[37m CAPTCHA   : %E%[33manticaptcha (Auto-Solve ON)%E%[0m
+if not defined CAPTCHA_SERVICE echo   %E%[32m[+]%E%[37m CAPTCHA   : %E%[33mDisabled%E%[0m
 echo   %E%[32m[+]%E%[37m Detection : %E%[33mAuto (MEmu/LDPlayer TCP Scan)%E%[0m
 echo.
 echo   %E%[36m==================================================%E%[0m
@@ -522,6 +530,60 @@ echo.
 set "CONFIRM="
 set /p "CONFIRM=  %E%[32m>%E%[37m Press ENTER to start or N to cancel: %E%[0m"
 if /i "!CONFIRM!"=="N" goto ask_numbers
+
+:: == Timezone =========================================
+:ask_timezone
+cls
+call :print_header
+echo   %E%[33m  Device Timezone%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
+echo.
+echo   %E%[32m[1]%E%[37m Auto (Match number country code)%E%[0m
+echo   %E%[32m[2]%E%[37m System Default (Current PC Timezone)%E%[0m
+echo   %E%[32m[3]%E%[37m Custom Timezone (e.g. Asia/Dhaka)%E%[0m
+echo   %E%[32m[4]%E%[37m Custom GMT (e.g. GMT+6, GMT-5)%E%[0m
+echo.
+set "TZ_CHOICE="
+set /p "TZ_CHOICE=  %E%[32m>%E%[37m Choice [1-4] (Default 1): %E%[0m"
+if "!TZ_CHOICE!"=="" set "TZ_CHOICE=1"
+
+set "DEVICE_TZ=auto"
+if "!TZ_CHOICE!"=="2" set "DEVICE_TZ=default"
+if "!TZ_CHOICE!"=="3" (
+    echo.
+    set /p "DEVICE_TZ=  %E%[32m>%E%[37m Enter Timezone (e.g. Asia/Dhaka): %E%[0m"
+    if "!DEVICE_TZ!"=="" set "DEVICE_TZ=auto"
+)
+if "!TZ_CHOICE!"=="4" (
+    echo.
+    set /p "DEVICE_TZ=  %E%[32m>%E%[37m Enter GMT (e.g. GMT+6): %E%[0m"
+    if "!DEVICE_TZ!"=="" set "DEVICE_TZ=auto"
+)
+echo.
+
+:: == Emulator Country =================================
+:ask_country
+cls
+call :print_header
+echo   %E%[33m  Device Country%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
+echo.
+echo   %E%[32m[1]%E%[37m Auto (Match number country code)%E%[0m
+echo   %E%[32m[2]%E%[37m Match Language (e.g. US for English)%E%[0m
+echo   %E%[32m[3]%E%[37m Custom Country Code (e.g. BD, BR, ID)%E%[0m
+echo.
+set "COUNTRY_CHOICE="
+set /p "COUNTRY_CHOICE=  %E%[32m>%E%[37m Choice [1-3] (Default 1): %E%[0m"
+if "!COUNTRY_CHOICE!"=="" set "COUNTRY_CHOICE=1"
+
+set "DEVICE_COUNTRY=auto"
+if "!COUNTRY_CHOICE!"=="2" set "DEVICE_COUNTRY=language"
+if "!COUNTRY_CHOICE!"=="3" (
+    echo.
+    set /p "DEVICE_COUNTRY=  %E%[32m>%E%[37m Enter 2-Letter Country Code (e.g. BD): %E%[0m"
+    if "!DEVICE_COUNTRY!"=="" set "DEVICE_COUNTRY=auto"
+)
+echo.
 
 :: == ACCOUNT CHECKER (PRE-SCAN) ===============================
 cls
@@ -595,7 +657,7 @@ echo   %E%[33m[*] App: !APP_DISPLAY!%E%[0m
 echo   %E%[33m[*] Scanning for ADB devices on local network...%E%[0m
 echo.
 
-"!NODE_EXE!" "%~dp0index.js" "!NUMBERS_FILE!" "!RESENDS!" "!LANG_CODE!" "!PROXY_FILE!" "!APP_KEY!"
+"!NODE_EXE!" "%~dp0index.js" "!NUMBERS_FILE!" "!RESENDS!" "!LANG_CODE!" "!PROXY_FILE!" "!APP_KEY!" "!DEVICE_TZ!" "!DEVICE_COUNTRY!"
 set "ENGINE_EXIT=!errorlevel!"
 
 :: ── DONE ──────────────────────────────────────────────────────
