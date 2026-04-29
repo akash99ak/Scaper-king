@@ -686,6 +686,60 @@ set "BANDWIDTH_SAVER=0"
 if "!BW_CHOICE!"=="2" set "BANDWIDTH_SAVER=1"
 
 
+:: == STEP 7: Timezone =========================================
+:ask_timezone
+cls
+call :print_header
+echo   %E%[33m  Step 7: Device Timezone%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
+echo.
+echo   %E%[32m[1]%E%[37m Auto (Match number country code)%E%[0m
+echo   %E%[32m[2]%E%[37m System Default (Current PC Timezone)%E%[0m
+echo   %E%[32m[3]%E%[37m Custom Timezone (e.g. Asia/Dhaka)%E%[0m
+echo   %E%[32m[4]%E%[37m Custom GMT (e.g. GMT+6, GMT-5)%E%[0m
+echo.
+set "TZ_CHOICE="
+set /p "TZ_CHOICE=  %E%[32m>%E%[37m Choice [1-4] (Default 1): %E%[0m"
+if "!TZ_CHOICE!"=="" set "TZ_CHOICE=1"
+
+set "DEVICE_TZ=auto"
+if "!TZ_CHOICE!"=="2" set "DEVICE_TZ=default"
+if "!TZ_CHOICE!"=="3" (
+    echo.
+    set /p "DEVICE_TZ=  %E%[32m>%E%[37m Enter Timezone (e.g. Asia/Dhaka): %E%[0m"
+    if "!DEVICE_TZ!"=="" set "DEVICE_TZ=auto"
+)
+if "!TZ_CHOICE!"=="4" (
+    echo.
+    set /p "DEVICE_TZ=  %E%[32m>%E%[37m Enter GMT (e.g. GMT+6): %E%[0m"
+    if "!DEVICE_TZ!"=="" set "DEVICE_TZ=auto"
+)
+echo.
+
+:: == STEP 8: Emulator Country =================================
+:ask_country
+cls
+call :print_header
+echo   %E%[33m  Step 8: Device Country%E%[0m
+echo   %E%[36m--------------------------------------------------%E%[0m
+echo.
+echo   %E%[32m[1]%E%[37m Auto (Match number country code)%E%[0m
+echo   %E%[32m[2]%E%[37m Match Language (e.g. US for English)%E%[0m
+echo   %E%[32m[3]%E%[37m Custom Country Code (e.g. BD, BR, ID)%E%[0m
+echo.
+set "COUNTRY_CHOICE="
+set /p "COUNTRY_CHOICE=  %E%[32m>%E%[37m Choice [1-3] (Default 1): %E%[0m"
+if "!COUNTRY_CHOICE!"=="" set "COUNTRY_CHOICE=1"
+
+set "DEVICE_COUNTRY=auto"
+if "!COUNTRY_CHOICE!"=="2" set "DEVICE_COUNTRY=language"
+if "!COUNTRY_CHOICE!"=="3" (
+    echo.
+    set /p "DEVICE_COUNTRY=  %E%[32m>%E%[37m Enter 2-Letter Country Code (e.g. BD): %E%[0m"
+    if "!DEVICE_COUNTRY!"=="" set "DEVICE_COUNTRY=auto"
+)
+echo.
+
 :: ── CONFIRM ───────────────────────────────────────────────────
 cls
 call :print_header
@@ -804,7 +858,7 @@ if defined LANG_CODE (
 )
 
 set "BANDWIDTH_SAVER=!BANDWIDTH_SAVER!"
-"!NODE_EXE!" "%~dp0autofill.js" "!NUMBERS_FILE!" "!PROXY_FILE!" "!WORKERS!" "!RUN_LANG!" "!PROXY_CHOICE!" "!PROXY_COUNTRY!" "!RESENDS!" "!CUSTOM_URLS!" "!PROXY_TIMING!" "!PROXY_USE_LIMIT!" "!HARDWARE_ID!" "!PROXY_PROTOCOL!"
+"!NODE_EXE!" "%~dp0autofill.js" "!NUMBERS_FILE!" "!PROXY_FILE!" "!WORKERS!" "!RUN_LANG!" "!PROXY_CHOICE!" "!PROXY_COUNTRY!" "!RESENDS!" "!CUSTOM_URLS!" "!PROXY_TIMING!" "!PROXY_USE_LIMIT!" "!HARDWARE_ID!" "!PROXY_PROTOCOL!" "!DEVICE_TZ!" "!DEVICE_COUNTRY!"
 
 :: ── DONE ──────────────────────────────────────────────────────
 echo.
